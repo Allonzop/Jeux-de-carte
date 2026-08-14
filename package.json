@@ -1,0 +1,24 @@
+{
+  "name": "boloss",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BOLOSS - Jeu de cartes web 1v1 (MVP). Server-authoritative card game with Socket.io + React.",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @boloss/shared",
+    "dev": "npm run build:shared && concurrently -n shared,server,client -c cyan,magenta,green \"npm:dev:shared\" \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:shared": "npm run dev -w @boloss/shared",
+    "dev:server": "npm run dev -w @boloss/server",
+    "dev:client": "npm run dev -w @boloss/client",
+    "build": "npm run build:shared && npm run build -w @boloss/server && npm run build -w @boloss/client",
+    "start": "npm run start -w @boloss/server",
+    "typecheck": "npm run build:shared && npm run typecheck -w @boloss/server && npm run typecheck -w @boloss/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

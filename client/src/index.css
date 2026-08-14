@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 50% 0%, #1b4d38 0%, #0f261c 55%, #08160f 100%);
+  color: #e9e2cf;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: 'Bangers', system-ui, sans-serif;
+  letter-spacing: 0.03em;
+}
+
+/* Thin scrollbars for the log / hand overflow. */
+.thin-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+}
+
+.card-frame {
+  background: #cfc7b0;
+  border: 3px solid #14110c;
+  border-radius: 8px;
+}

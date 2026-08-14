@@ -201,6 +201,7 @@ export interface PlayerState {
   graveyard: CardInstance[];
   sinsPlayed: string[]; // ids of "péchés capitaux" already used this game
   setupDone: boolean; // has confirmed their face-down placement
+  turnsStarted: number; // how many of this player's turns have begun (for setup sickness)
 }
 
 export interface GameState {

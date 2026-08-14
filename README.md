@@ -162,7 +162,7 @@ variable d'environnement si besoin.
 - **Main** : 10 cartes max, l'excédent de pioche est défaussé.
 - **Plateau** : 1 HÉRO + 4 invocations max.
 - **Tour** : Début (pioche 2, effets de début) → Phase Principale → Phase de Combat → Fin (nettoyage des buffs temporaires).
-- **Mal d'invocation** : une invocation ne peut pas attaquer le tour où elle est posée (sauf *Charge* ; les invocations de setup peuvent attaquer dès le 1er tour).
+- **Mal d'invocation** : une invocation ne peut pas attaquer le tour où elle est posée (sauf *Charge*). Les invocations posées en mise en place dorment aussi pendant tout le 1er tour de leur propriétaire.
 - **Ciblage libre** : on peut attaquer une invocation OU le HÉRO — sauf en présence d'une *Provocation*.
 - **Destruction** : à 0 HP, la carte part au cimetière (déclenche les effets à la mort).
 

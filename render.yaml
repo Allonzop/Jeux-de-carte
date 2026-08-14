@@ -1,16 +1,11 @@
 # Déploiement 1-clic sur Render (https://render.com) — supporte les WebSockets.
 # 1. Pousse ce repo sur GitHub.
 # 2. Sur Render : New > Blueprint, connecte le repo. Render lit ce fichier.
-# 3. Render build et te donne une URL publique (ex: https://boloss.onrender.com).
-#    Ouvre-la sur 2 appareils différents pour jouer en 1v1.
+# 3. Render build l'image Docker et te donne une URL publique
+#    (ex: https://boloss.onrender.com). Ouvre-la sur 2 appareils pour jouer en 1v1.
 services:
   - type: web
     name: boloss
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
     healthCheckPath: /health
-    envVars:
-      - key: NODE_VERSION
-        value: '22'

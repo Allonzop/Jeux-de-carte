@@ -62,6 +62,7 @@ function emptyPlayer(id: PlayerId, name: string): PlayerState {
     graveyard: [],
     sinsPlayed: [],
     setupDone: false,
+    turnsStarted: 0,
   };
 }
 
@@ -145,6 +146,7 @@ export function startGame(state: GameState, rng: () => number = Math.random): vo
     p.board = [];
     p.sinsPlayed = [];
     p.setupDone = false;
+    p.turnsStarted = 0;
     // Opening hand.
     for (let i = 0; i < OPENING_HAND; i++) {
       const card = p.deck.shift();
@@ -175,7 +177,9 @@ export function setupPlace(state: GameState, playerId: PlayerId, instanceId: str
   const inst = p.hand[idx];
   if (!isSetupPlaceable(inst.cardId)) return { ok: false, error: 'Seules les invocations sans condition peuvent être posées en mise en place.' };
   p.hand.splice(idx, 1);
-  const bc = makeBoardCard(state, inst.cardId, playerId, /* summonedThisTurn */ false);
+  // Mal d'invocation : une carte posée en mise en place ne peut pas attaquer
+  // pendant le 1er tour de son propriétaire (le flag n'est levé qu'à son 2e tour).
+  const bc = makeBoardCard(state, inst.cardId, playerId, /* summonedThisTurn */ true);
   bc.instanceId = inst.instanceId;
   bc.hidden = true;
   p.board.push(bc);
@@ -669,11 +673,14 @@ function drawCards(state: GameState, playerId: PlayerId, count: number): void {
 
 export function beginTurn(state: GameState, playerId: PlayerId, firstTurn = false): void {
   const p = state.players[playerId];
+  p.turnsStarted += 1;
   const chars = [p.hero, ...p.board].filter(Boolean) as BoardCard[];
 
-  // Reset combat flags.
+  // Reset combat flags. Le mal d'invocation n'est levé qu'à partir du 2e tour
+  // du joueur : les invocations posées en mise en place restent donc
+  // endormies pendant tout son 1er tour.
   for (const c of chars) {
-    c.summonedThisTurn = false;
+    if (p.turnsStarted > 1) c.summonedThisTurn = false;
     c.hasAttackedThisTurn = false;
     c.extraAttacks = 0;
   }

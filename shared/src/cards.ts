@@ -88,9 +88,8 @@ const CARDS: CardDef[] = [
     type: 'ACT',
     rank: 'B',
     image: 'avocat_gourmandise.jpg',
-    effectText: 'Péché capital. Ton HÉRO gagne +20 HP.',
+    effectText: 'Péché capital. Multiplie par 2 les bonus de PV de tes objets équipés.',
     tags: ['sin'],
-    effects: [{ trigger: 'ON_PLAY', action: 'BUFF_HP', target: 'ALLIED_HERO', value: 20, duration: 'PERMANENT' }],
   },
   {
     id: 'avocat_luxure',
@@ -99,9 +98,8 @@ const CARDS: CardDef[] = [
     type: 'ACT',
     rank: 'B',
     image: 'avocat_luxure.jpg',
-    effectText: 'Péché capital. Séduction manipulatrice.',
+    effectText: 'Péché capital. Vole un objet du deck adverse et ajoute-le à ta main.',
     tags: ['sin'],
-    effects: [{ trigger: 'ON_PLAY', action: 'FLAVOR' }],
   },
   {
     id: 'avocat_paresse',
@@ -121,9 +119,8 @@ const CARDS: CardDef[] = [
     type: 'ACT',
     rank: 'B',
     image: 'avocat_colere.jpg',
-    effectText: 'Péché capital. +20 attaque à toutes tes invocations ce tour-ci.',
+    effectText: 'Péché capital. Multiplie par 2 les bonus d\'attaque de tes objets équipés.',
     tags: ['sin'],
-    effects: [{ trigger: 'ON_PLAY', action: 'BUFF_ATTACK', target: 'ALLIED_INVOCATION', massTarget: true, value: 20, duration: 1 }],
   },
   {
     id: 'avocat_avarice',
@@ -132,9 +129,8 @@ const CARDS: CardDef[] = [
     type: 'ACT',
     rank: 'B',
     image: 'avocat_avarice.jpg',
-    effectText: 'Péché capital. La cupidité incarnée.',
+    effectText: 'Péché capital. Cherche un objet dans ton deck et ajoute-le à ta main.',
     tags: ['sin'],
-    effects: [{ trigger: 'ON_PLAY', action: 'FLAVOR' }],
   },
   {
     id: 'avocat_envie',
@@ -143,9 +139,8 @@ const CARDS: CardDef[] = [
     type: 'ACT',
     rank: 'B',
     image: 'avocat_envie.jpg',
-    effectText: 'Péché capital. La jalousie te ronge.',
+    effectText: 'Péché capital. Renvoie une de tes invocations dans ta main et pose une invocation de ta main à sa place.',
     tags: ['sin'],
-    effects: [{ trigger: 'ON_PLAY', action: 'FLAVOR' }],
   },
   {
     id: 'avocat_orgueil',
@@ -154,9 +149,9 @@ const CARDS: CardDef[] = [
     type: 'ACT',
     rank: 'B',
     image: 'avocat_orgueil.jpg',
-    effectText: 'Péché capital. La fierté avant la chute.',
+    effectText: 'Péché capital. Tes invocations ne peuvent plus attaquer ce tour-ci (à jouer en dernier).',
     tags: ['sin'],
-    effects: [{ trigger: 'ON_PLAY', action: 'FLAVOR' }],
+    effects: [{ trigger: 'ON_PLAY', action: 'CANNOT_ATTACK', target: 'ALLIED_INVOCATION', massTarget: true, duration: 1 }],
   },
   {
     id: 'avocat_veritable_avocat',
@@ -168,8 +163,9 @@ const CARDS: CardDef[] = [
     baseHp: 100,
     baseAttack: 110,
     attackName: 'Idée Tranchante',
-    attackDesc: 'Manipulation du Diable — une logique implacable.',
+    attackDesc: 'Manipulation du Diable — copie l\'attaque du plus fort adversaire si elle est supérieure.',
     summoningConditions: [{ type: 'SEVEN_SINS', count: 7 }],
+    effects: [{ trigger: 'PASSIVE', action: 'COPY_ATTACK', text: 'Manipulation du Diable' }],
   },
   {
     id: 'avocat_lancer_tortue',
@@ -191,8 +187,9 @@ const CARDS: CardDef[] = [
     baseHp: 100,
     baseAttack: 110,
     attackName: 'Force de la Raison',
-    attackDesc: 'Omnipotence Divine — la raison tranche toute chose.',
+    attackDesc: 'Omnipotence Divine — copie l\'attaque du plus fort adversaire si elle est supérieure.',
     summoningConditions: [{ type: 'SEVEN_SINS', count: 7 }],
+    effects: [{ trigger: 'PASSIVE', action: 'COPY_ATTACK', text: 'Omnipotence Divine' }],
   },
 
   /* ============================================================= *
@@ -370,8 +367,8 @@ const CARDS: CardDef[] = [
     type: 'ACT',
     rank: 'B',
     image: 'floral_coup_pression.jpg',
-    effectText: '+30 attaque à une invocation ce tour-ci (elle frappe plus fort).',
-    effects: [{ trigger: 'ON_PLAY', action: 'BUFF_ATTACK', target: 'ALLIED_INVOCATION', value: 30, duration: 1 }],
+    effectText: 'Une invocation de rang C peut attaquer une 2e fois ce tour, mais subit 30 dégâts.',
+    // Bespoke — resolved in engine (SPECIAL_ACTS).
   },
   {
     id: 'floral_revolver_violet',
@@ -504,8 +501,8 @@ const CARDS: CardDef[] = [
     type: 'OBJET',
     rank: 'F',
     image: 'jules_idee_ennui.jpg',
-    effectText: 'Jeu de Cartes Maison — carte collector, aucun effet. Sois fier de toi.',
-    effects: [{ trigger: 'ON_PLAY', action: 'FLAVOR' }],
+    effectText: 'Jeu de Cartes Maison — pioche 1 carte (et sois fier de toi).',
+    effects: [{ trigger: 'ON_PLAY', action: 'DRAW', value: 1 }],
   },
   {
     id: 'jules_fusil_pompe',

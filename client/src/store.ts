@@ -35,6 +35,10 @@ interface StoreState {
   setName: (name: string) => void;
   toggleReady: () => void;
 
+  setupPlace: (instanceId: string) => void;
+  setupUnplace: (instanceId: string) => void;
+  setupReady: () => void;
+
   selectHandCard: (handInstanceId: string) => void;
   selectAttacker: (attackerInstanceId: string) => void;
   chooseTarget: (targetInstanceId: string) => void;
@@ -105,6 +109,10 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!g || !you) return;
     get().socket?.emit('ready', { ready: !g.players[you].ready });
   },
+
+  setupPlace: (instanceId) => get().socket?.emit('action', { type: 'SETUP_PLACE', instanceId } as GameAction),
+  setupUnplace: (instanceId) => get().socket?.emit('action', { type: 'SETUP_UNPLACE', instanceId } as GameAction),
+  setupReady: () => get().socket?.emit('action', { type: 'SETUP_DONE' } as GameAction),
 
   selectHandCard: (handInstanceId) => {
     const { game, you, interaction, socket } = get();

@@ -49,8 +49,10 @@ export type EffectAction =
   | 'CHARGE' // passive: can attack the turn it is summoned
   | 'AURA_BUFF' // passive: buff all allied invocations of `faction`
   | 'GAIN_ATTACK_PER_TURN' // at each of the owner's turn starts, +value attack (permanent)
+  | 'COPY_ATTACK' // passive: attack becomes at least the strongest enemy attack
   | 'CANNOT_ATTACK' // apply a "cannot attack" status for `duration` turns
   | 'SUMMON_FROM_DECK' // pull `summonCardId` from the owner's deck onto the board
+  | 'DRAW' // draw `value` cards
   | 'FLAVOR'; // no mechanical effect (collector / meme cards)
 
 export interface CardEffect {
@@ -164,6 +166,10 @@ export interface BoardCard {
   equipment: Equipment[];
   summonedThisTurn: boolean;
   hasAttackedThisTurn: boolean;
+  /** Extra attacks granted this turn (e.g. Coup de Pression). */
+  extraAttacks: number;
+  /** Face-down during the setup phase — cardId is stripped in the opponent's view. */
+  hidden?: boolean;
 }
 
 /** A card instance living in a hand / deck / graveyard. */
@@ -180,7 +186,7 @@ export interface LogEntry {
 
 export type GamePhase = 'MAIN' | 'COMBAT';
 
-export type GameStatus = 'LOBBY' | 'PLAYING' | 'FINISHED';
+export type GameStatus = 'LOBBY' | 'SETUP' | 'PLAYING' | 'FINISHED';
 
 export interface PlayerState {
   id: PlayerId;
@@ -194,6 +200,7 @@ export interface PlayerState {
   deck: CardInstance[];
   graveyard: CardInstance[];
   sinsPlayed: string[]; // ids of "péchés capitaux" already used this game
+  setupDone: boolean; // has confirmed their face-down placement
 }
 
 export interface GameState {
@@ -214,6 +221,9 @@ export interface GameState {
  * ------------------------------------------------------------------ */
 
 export type GameAction =
+  | { type: 'SETUP_PLACE'; instanceId: string }
+  | { type: 'SETUP_UNPLACE'; instanceId: string }
+  | { type: 'SETUP_DONE' }
   | { type: 'PLAY_CARD'; instanceId: string; targetInstanceId?: string; slotIndex?: number }
   | { type: 'ATTACK'; attackerInstanceId: string; targetInstanceId: string }
   | { type: 'NEXT_PHASE' }
@@ -237,6 +247,7 @@ export interface RedactedPlayerState {
   deckCount: number;
   graveyard: CardInstance[];
   sinsPlayed: string[];
+  setupDone: boolean;
 }
 
 export interface RedactedGameState {

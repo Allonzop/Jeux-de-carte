@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { BoardCard } from '@boloss/shared';
 import { attackOf, cardImg, cardBackImg, cardStatus, getCard, maxHp } from '../lib/game';
 
@@ -52,6 +52,28 @@ export default function CardView({
   const def = useMemo(() => (cardId ? getCard(cardId) : undefined), [cardId]);
   const anchorProps = anchorKey && anchorId ? { [`data-${anchorKey}`]: anchorId } : {};
 
+  // Floating damage / heal number when a board card's HP changes.
+  const [float, setFloat] = useState<{ n: number; heal: boolean; key: number } | null>(null);
+  const [shake, setShake] = useState(false);
+  const prevHp = useRef<number | undefined>(board?.hp);
+  useEffect(() => {
+    const hp = board?.hp;
+    if (hp === undefined) return;
+    const prev = prevHp.current;
+    if (prev !== undefined && hp !== prev) {
+      const diff = hp - prev;
+      setFloat({ n: Math.abs(diff), heal: diff > 0, key: Date.now() });
+      if (diff < 0) {
+        setShake(true);
+        setTimeout(() => setShake(false), 350);
+      }
+      const t = setTimeout(() => setFloat(null), 850);
+      prevHp.current = hp;
+      return () => clearTimeout(t);
+    }
+    prevHp.current = hp;
+  }, [board?.hp]);
+
   if (faceDown || !def) {
     return (
       <div
@@ -76,7 +98,7 @@ export default function CardView({
       title={title ?? def.name}
       disabled={!onClick}
       {...anchorProps}
-      className={`card-frame group relative ${SIZES[size]} aspect-[3/4] overflow-hidden shadow-card transition-transform duration-150 disabled:cursor-default ${HIGHLIGHT[highlight]} ${dimmed ? 'opacity-60 grayscale' : ''} animate-pop`}
+      className={`card-frame group relative ${SIZES[size]} aspect-[3/4] overflow-hidden shadow-card transition-transform duration-150 disabled:cursor-default ${HIGHLIGHT[highlight]} ${dimmed ? 'opacity-60 grayscale' : ''} ${shake ? 'animate-shake' : ''} animate-pop`}
     >
       <img src={cardImg(def.image)} alt={def.name} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
 
@@ -113,6 +135,19 @@ export default function CardView({
       {board && board.equipment.length > 0 && (
         <div className="absolute bottom-0 left-0 rounded-tr-md bg-black/75 px-1 text-[10px] text-boloss-gold">
           ⚙{board.equipment.length}
+        </div>
+      )}
+
+      {/* Floating damage / heal. */}
+      {float && (
+        <div
+          key={float.key}
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center animate-floatUp font-display text-3xl drop-shadow ${
+            float.heal ? 'text-emerald-300' : 'text-red-400'
+          }`}
+        >
+          {float.heal ? '+' : '−'}
+          {float.n}
         </div>
       )}
     </button>

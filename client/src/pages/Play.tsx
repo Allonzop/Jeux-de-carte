@@ -17,6 +17,7 @@ import CardView, { type Highlight } from '../components/CardView';
 import TargetingArrow from '../components/TargetingArrow';
 import LogPanel from '../components/LogPanel';
 import Lobby from '../components/Lobby';
+import SetupScreen from '../components/SetupScreen';
 import { canAttackWith, cardBackImg, isYourTurn, legalAttackTargetIds, legalPlayTargetIds } from '../lib/game';
 
 export default function Play() {
@@ -63,6 +64,7 @@ export default function Play() {
   }
 
   if (game.status === 'LOBBY') return <Lobby game={game} />;
+  if (game.status === 'SETUP') return <SetupScreen game={game} />;
 
   return <Board game={game} />;
 }

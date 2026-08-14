@@ -8,15 +8,15 @@ export const DECK_SIZE = 30; // deck cap
 export const MAX_COPIES = 2; // max copies of the same card in a deck
 
 /**
- * Opening hand.
+ * Main d'ouverture : 10 cartes (PRD §2).
  *
- * PRD §2 specifies drawing 10 cards during a face-down setup phase where players
- * pre-place their HERO and 0–4 invocations before revealing the board. This MVP
- * does not implement the face-down pre-placement ritual, so drawing 10 (a full
- * hand) would force an immediate discard on the very first Start-of-Turn draw.
- * We open with 7 instead — enough to have real choices without wasting draws.
+ * On implémente la phase de setup face cachée du PRD : après avoir pioché 10,
+ * chaque joueur pose son HERO et 0 à 4 invocations face cachée, puis on révèle
+ * le plateau. Poser des invocations réduit la main avant le premier tour, ce qui
+ * évite une défausse immédiate à la première pioche.
  */
-export const OPENING_HAND = 7;
+export const OPENING_HAND = 10;
+export const MAX_SETUP_INVOCATIONS = 4; // invocations posables face cachée en setup
 
 export const FACTIONS: Faction[] = ['avocat', 'floral', 'jules', 'monster', 'soldat'];
 

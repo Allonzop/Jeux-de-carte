@@ -63,7 +63,7 @@ client/   → @boloss/client : React + Vite + TypeScript + Tailwind + Zustand.
 
 ---
 
-## 🚀 Démarrage
+## 🚀 Démarrage (développement)
 
 Pré-requis : **Node 18+** (testé sur Node 22).
 
@@ -84,9 +84,53 @@ ouvre-le dans un **second onglet / navigateur** pour incarner le second joueur.
 | `npm start` | Lance le serveur, qui sert aussi le client buildé |
 | `npm run typecheck` | Vérifie les types sur tout le monorepo |
 
-En production, le serveur sert le client compilé : un seul service sur `PORT`
-(défaut 3001). Le client détecte automatiquement l'URL du serveur ; pour un
-déploiement séparé, définir `VITE_SERVER_URL` au build du client.
+---
+
+## 🌐 Jouer sur 2 machines différentes
+
+Le client compilé est servi par le serveur : **un seul service** sur `PORT`
+(défaut 3001), et le client se connecte automatiquement à la même origine.
+Trois façons de tester à deux, de la plus simple à la plus durable :
+
+### Option 1 — Réseau local (le plus rapide, gratuit)
+
+Sur ta machine :
+
+```bash
+npm install && npm run build && npm start
+```
+
+Trouve ton IP locale (`ipconfig` sur Windows, `ip a` / `ifconfig` sur Mac/Linux),
+puis sur **l'autre appareil du même réseau Wi-Fi**, ouvre `http://TON_IP:3001`
+(ex: `http://192.168.1.42:3001`). Crée une partie, partage le lien : vous jouez
+chacun sur votre machine.
+
+### Option 2 — Hébergement gratuit Render (URL publique, jouable partout)
+
+1. Pousse ce repo sur GitHub (déjà fait sur ta branche).
+2. Sur [Render](https://render.com) : **New → Blueprint**, connecte le repo.
+   Render lit `render.yaml`, build et te donne une URL publique
+   (ex: `https://boloss.onrender.com`) — WebSockets supportés.
+3. Ouvre l'URL sur 2 appareils quelconques (même hors de ton réseau).
+
+> Le plan gratuit s'endort après inactivité : le 1er chargement peut prendre
+> ~30 s, ensuite c'est fluide.
+
+### Option 3 — VPS / Docker (contrôle total)
+
+Un `Dockerfile` est fourni :
+
+```bash
+docker build -t boloss .
+docker run -p 3001:3001 boloss     # puis ouvre http://IP_DU_VPS:3001
+```
+
+Fonctionne sur n'importe quel VPS (Hetzner, DigitalOcean, Scaleway…) ou toute
+plateforme qui accepte un conteneur (Railway, Fly.io, etc.). Règle `PORT` via
+variable d'environnement si besoin.
+
+> Pour un client hébergé séparément du serveur, définir `VITE_SERVER_URL` au
+> build du client.
 
 ---
 
@@ -94,27 +138,30 @@ déploiement séparé, définir `VITE_SERVER_URL` au build du client.
 
 - **But** : réduire les HP du HÉRO adverse à 0.
 - **Pas de mana** : les actions sont illimitées tant que les conditions sont remplies.
-- **Main** : 10 cartes max, l'excédent piochage est défaussé.
+- **Setup** : pioche de **10 cartes**, puis pose du HÉRO et de 0 à 4 invocations
+  **face cachée**, puis révélation du plateau (pile ou face pour le 1er joueur).
+- **Main** : 10 cartes max, l'excédent de pioche est défaussé.
 - **Plateau** : 1 HÉRO + 4 invocations max.
 - **Tour** : Début (pioche 2, effets de début) → Phase Principale → Phase de Combat → Fin (nettoyage des buffs temporaires).
-- **Mal d'invocation** : une invocation ne peut pas attaquer le tour où elle est posée (sauf *Charge*).
+- **Mal d'invocation** : une invocation ne peut pas attaquer le tour où elle est posée (sauf *Charge* ; les invocations de setup peuvent attaquer dès le 1er tour).
 - **Ciblage libre** : on peut attaquer une invocation OU le HÉRO — sauf en présence d'une *Provocation*.
 - **Destruction** : à 0 HP, la carte part au cimetière (déclenche les effets à la mort).
 
-### Écarts assumés pour le MVP
+### Toutes les cartes sont fonctionnelles
 
-- **Main d'ouverture de 7 cartes** (au lieu de 10) : le PRD prévoit une pose
-  face cachée en setup ; comme cette phase n'est pas implémentée, ouvrir à 10
-  forcerait une défausse immédiate. Voir `shared/src/constants.ts`.
-- Quelques effets très spécifiques (copie d'attaque adverse, échanges de cartes
-  entre decks) sont simplifiés ou marqués « collector » — commentés dans
-  `shared/src/cards.ts`.
+Les 71 cartes ont un effet réel, y compris les cartes bespoke : les 7 péchés
+capitaux (Gourmandise/Colère doublent les bonus des objets, Luxure/Avarice
+cherchent un objet, Envie échange une invocation, Paresse/Orgueil bloquent
+l'attaque), la copie d'attaque des finishers rang S (Manipulation du Diable /
+Omnipotence Divine), Coup de Pression (2e attaque contre 30 PV), Dios Mios
+(destruction), Reboot (déséquipement), Contract Révolutionnaire (prise de
+contrôle). Voir `shared/src/engine.ts`. Seule la carte-blague rang F
+(*Idée pour Contrer l'Ennui*) a un effet volontairement mineur (pioche 1).
 
 ---
 
 ## 🗺️ Suite (jalons futurs)
 
-- Phase de setup face cachée (pose simultanée HÉRO + invocations).
 - Deck-building personnalisé (au lieu des decks de faction auto-générés).
-- Effets exotiques restants + animations de combat.
+- Effets de combat plus riches (animations d'attaque, sons).
 - Persistance des parties / spectateurs / reconnexion longue durée.

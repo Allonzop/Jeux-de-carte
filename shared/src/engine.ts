@@ -35,7 +35,7 @@ import type {
 } from './types';
 import { getCard, SIN_IDS } from './cards';
 import { buildDeck, shuffle } from './deck';
-import { DRAW_PER_TURN, MAX_BOARD, MAX_HAND, OPENING_HAND } from './constants';
+import { DRAW_PER_TURN, MAX_BOARD, MAX_HAND, MAX_SETUP_INVOCATIONS, OPENING_HAND } from './constants';
 
 export interface ActionResult {
   ok: boolean;
@@ -61,6 +61,7 @@ function emptyPlayer(id: PlayerId, name: string): PlayerState {
     deck: [],
     graveyard: [],
     sinsPlayed: [],
+    setupDone: false,
   };
 }
 
@@ -121,9 +122,14 @@ function makeBoardCard(state: GameState, cardId: string, owner: PlayerId, summon
     equipment: [],
     summonedThisTurn,
     hasAttackedThisTurn: false,
+    extraAttacks: 0,
   };
 }
 
+/**
+ * Setup phase (PRD §2) : chaque joueur pioche 10 cartes, place son HERO, puis
+ * pourra poser 0 à 4 invocations face cachée avant la révélation du plateau.
+ */
 export function startGame(state: GameState, rng: () => number = Math.random): void {
   for (const pid of ['A', 'B'] as PlayerId[]) {
     const p = state.players[pid];
@@ -138,18 +144,70 @@ export function startGame(state: GameState, rng: () => number = Math.random): vo
     p.graveyard = [];
     p.board = [];
     p.sinsPlayed = [];
+    p.setupDone = false;
     // Opening hand.
     for (let i = 0; i < OPENING_HAND; i++) {
       const card = p.deck.shift();
       if (card) p.hand.push(card);
     }
   }
-  state.status = 'PLAYING';
-  state.activePlayer = rng() < 0.5 ? 'A' : 'B';
+  state.status = 'SETUP';
+  state.activePlayer = rng() < 0.5 ? 'A' : 'B'; // pile ou face pour le premier joueur
   state.phase = 'MAIN';
   state.turnNumber = 1;
   state.winner = null;
-  log(state, `La partie commence ! ${state.players[state.activePlayer].name} joue en premier.`);
+  log(state, `Mise en place : posez votre HÉRO et jusqu'à ${MAX_SETUP_INVOCATIONS} invocations face cachée.`);
+}
+
+/** Can this hand card be placed face-down during setup? (basic invocation, no sacrifice) */
+function isSetupPlaceable(cardId: string): boolean {
+  const def = getCard(cardId);
+  return def.type === 'INVOCATION' && !def.summoningConditions?.length;
+}
+
+export function setupPlace(state: GameState, playerId: PlayerId, instanceId: string): ActionResult {
+  if (state.status !== 'SETUP') return { ok: false, error: 'La mise en place est terminée.' };
+  const p = state.players[playerId];
+  if (p.setupDone) return { ok: false, error: 'Tu as déjà validé ta mise en place.' };
+  if (p.board.length >= MAX_SETUP_INVOCATIONS) return { ok: false, error: `${MAX_SETUP_INVOCATIONS} invocations maximum en mise en place.` };
+  const idx = p.hand.findIndex((c) => c.instanceId === instanceId);
+  if (idx < 0) return { ok: false, error: 'Carte introuvable.' };
+  const inst = p.hand[idx];
+  if (!isSetupPlaceable(inst.cardId)) return { ok: false, error: 'Seules les invocations sans condition peuvent être posées en mise en place.' };
+  p.hand.splice(idx, 1);
+  const bc = makeBoardCard(state, inst.cardId, playerId, /* summonedThisTurn */ false);
+  bc.instanceId = inst.instanceId;
+  bc.hidden = true;
+  p.board.push(bc);
+  return { ok: true };
+}
+
+export function setupUnplace(state: GameState, playerId: PlayerId, instanceId: string): ActionResult {
+  if (state.status !== 'SETUP') return { ok: false, error: 'La mise en place est terminée.' };
+  const p = state.players[playerId];
+  if (p.setupDone) return { ok: false, error: 'Tu as déjà validé ta mise en place.' };
+  const idx = p.board.findIndex((c) => c.instanceId === instanceId);
+  if (idx < 0) return { ok: false, error: 'Invocation introuvable.' };
+  const bc = p.board.splice(idx, 1)[0];
+  p.hand.push({ instanceId: bc.instanceId, cardId: bc.cardId });
+  return { ok: true };
+}
+
+export function setupDone(state: GameState, playerId: PlayerId): ActionResult {
+  if (state.status !== 'SETUP') return { ok: false, error: 'La mise en place est terminée.' };
+  state.players[playerId].setupDone = true;
+  log(state, `${state.players[playerId].name} est prêt.`, playerId);
+  if (state.players.A.setupDone && state.players.B.setupDone) revealAndStart(state);
+  return { ok: true };
+}
+
+function revealAndStart(state: GameState): void {
+  for (const pid of ['A', 'B'] as PlayerId[]) {
+    for (const c of state.players[pid].board) c.hidden = false;
+  }
+  state.status = 'PLAYING';
+  recomputeAuras(state);
+  log(state, `Révélation du plateau ! ${state.players[state.activePlayer].name} joue en premier.`);
   beginTurn(state, state.activePlayer, /* firstTurn */ true);
 }
 
@@ -262,6 +320,21 @@ export function recomputeAuras(state: GameState): void {
       if (c.hp > maxHp(c)) c.hp = maxHp(c);
     }
   }
+
+  // COPY_ATTACK passive (Véritable Avocat / Ange) — recomputed after auras so it
+  // reads final enemy attack values. Attack becomes at least the strongest enemy.
+  for (const pid of ['A', 'B'] as PlayerId[]) {
+    const foeId = OTHER[pid];
+    const enemyChars = [state.players[foeId].hero, ...state.players[foeId].board].filter(Boolean) as BoardCard[];
+    const strongestEnemy = enemyChars.reduce((m, e) => Math.max(m, attackOf(e)), 0);
+    for (const c of state.players[pid].board) {
+      const copy = cardDef(c).effects?.find((e) => e.trigger === 'PASSIVE' && e.action === 'COPY_ATTACK');
+      if (!copy) continue;
+      const current = attackOf(c);
+      const bonus = Math.max(0, strongestEnemy - current);
+      if (bonus > 0) c.modifiers.push({ id: genId(state, 'mod'), kind: 'ATTACK', value: bonus, remainingTurns: null, fromAura: true, label: copy.text ?? 'Copie' });
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -359,7 +432,22 @@ const SPECIAL_ACT_REQUIREMENTS: Record<string, PlayRequirement> = {
   soldat_dios_mios: { needsTarget: true, side: 'ENEMY', kind: 'INVOCATION' },
   soldat_reboot: { needsTarget: true, side: 'ALLY', kind: 'INVOCATION' },
   soldat_contract_revo: { needsTarget: true, side: 'ENEMY', kind: 'INVOCATION' },
+  avocat_envie: { needsTarget: true, side: 'ALLY', kind: 'INVOCATION' },
+  floral_coup_pression: { needsTarget: true, side: 'ALLY', kind: 'INVOCATION' },
 };
+
+/** ACT cards resolved by a dedicated engine code path rather than generic effects. */
+const SPECIAL_ACT_IDS = new Set<string>([
+  'soldat_dios_mios',
+  'soldat_reboot',
+  'soldat_contract_revo',
+  'avocat_gourmandise',
+  'avocat_colere',
+  'avocat_luxure',
+  'avocat_avarice',
+  'avocat_envie',
+  'floral_coup_pression',
+]);
 
 function sideOfTarget(t: TargetType): 'ALLY' | 'ENEMY' | 'ANY' {
   if (t.startsWith('ENEMY')) return 'ENEMY';
@@ -406,6 +494,7 @@ export function legalPlayTargets(state: GameState, playerId: PlayerId, def: Card
   if (req.faction) pool = pool.filter((c) => cardDef(c).faction === req.faction);
   if (def.id === 'soldat_dios_mios') pool = pool.filter((c) => !!cardDef(c).summoningConditions?.length);
   if (def.id === 'soldat_reboot') pool = pool.filter((c) => c.equipment.length > 0);
+  if (def.id === 'floral_coup_pression') pool = pool.filter((c) => cardDef(c).rank === 'C');
   return pool;
 }
 
@@ -476,8 +565,13 @@ function applyPlayEffect(
       break;
     }
     case 'CANNOT_ATTACK': {
-      const pool = effect.massTarget ? foe.board : picked ? [picked] : [];
+      const side = effect.target && effect.target.startsWith('ALLIED') ? me.board : foe.board;
+      const pool = effect.massTarget ? side : picked ? [picked] : [];
       for (const t of pool) created.push(addModifier(state, t, { kind: 'CANNOT_ATTACK', remainingTurns: turns(effect.duration), sourceInstanceId, label: sourceLabel }));
+      break;
+    }
+    case 'DRAW': {
+      drawCards(state, playerId, effect.value ?? 1);
       break;
     }
     case 'FLAVOR':
@@ -581,6 +675,7 @@ export function beginTurn(state: GameState, playerId: PlayerId, firstTurn = fals
   for (const c of chars) {
     c.summonedThisTurn = false;
     c.hasAttackedThisTurn = false;
+    c.extraAttacks = 0;
   }
 
   // Start-of-turn: poison ticks + per-turn attack growth (Culture de l'Aura).
@@ -757,7 +852,7 @@ function playAct(state: GameState, playerId: PlayerId, handIdx: number, inst: Ca
   const p = state.players[playerId];
 
   // Bespoke ACTs.
-  if (def.id === 'soldat_dios_mios' || def.id === 'soldat_reboot' || def.id === 'soldat_contract_revo') {
+  if (SPECIAL_ACT_IDS.has(def.id)) {
     const special = resolveSpecialAct(state, playerId, def, target);
     if (!special.ok) return special;
   } else {
@@ -811,6 +906,91 @@ function resolveSpecialAct(state: GameState, playerId: PlayerId, def: CardDef, t
       recomputeAuras(state);
       return { ok: true };
     }
+    case 'avocat_gourmandise': {
+      // Multiplie par 2 les bonus de PV des objets équipés sur ton camp.
+      let doubled = 0;
+      for (const holder of [p.hero, ...p.board].filter(Boolean) as BoardCard[]) {
+        for (const eq of holder.equipment) {
+          for (const mid of [...eq.modifierIds]) {
+            const m = holder.modifiers.find((x) => x.id === mid);
+            if (m && m.kind === 'HP' && (m.value ?? 0) > 0) {
+              const id = addModifier(state, holder, { kind: 'HP', value: m.value, remainingTurns: m.remainingTurns, sourceInstanceId: eq.instanceId, label: 'Gourmandise' });
+              eq.modifierIds.push(id);
+              doubled++;
+            }
+          }
+        }
+      }
+      log(state, `Gourmandise double ${doubled} bonus de PV.`, playerId);
+      return { ok: true };
+    }
+    case 'avocat_colere': {
+      // Multiplie par 2 les bonus d'attaque des objets équipés sur ton camp.
+      let doubled = 0;
+      for (const holder of [p.hero, ...p.board].filter(Boolean) as BoardCard[]) {
+        for (const eq of holder.equipment) {
+          for (const mid of [...eq.modifierIds]) {
+            const m = holder.modifiers.find((x) => x.id === mid);
+            if (m && m.kind === 'ATTACK' && (m.value ?? 0) > 0) {
+              const id = addModifier(state, holder, { kind: 'ATTACK', value: m.value, remainingTurns: m.remainingTurns, sourceInstanceId: eq.instanceId, label: 'Colère' });
+              eq.modifierIds.push(id);
+              doubled++;
+            }
+          }
+        }
+      }
+      log(state, `Colère double ${doubled} bonus d'attaque.`, playerId);
+      return { ok: true };
+    }
+    case 'avocat_luxure': {
+      // Vole un objet du deck adverse et ajoute-le à ta main.
+      const foe = state.players[OTHER[playerId]];
+      const idx = foe.deck.findIndex((c) => getCard(c.cardId).type === 'OBJET');
+      if (idx < 0) return { ok: false, error: 'Aucun objet dans le deck adverse.' };
+      const stolen = foe.deck.splice(idx, 1)[0];
+      if (p.hand.length < MAX_HAND) p.hand.push(stolen);
+      else p.graveyard.push(stolen);
+      log(state, `Luxure vole ${getCard(stolen.cardId).name} du deck adverse.`, playerId);
+      return { ok: true };
+    }
+    case 'avocat_avarice': {
+      // Cherche un objet dans ton deck et ajoute-le à ta main.
+      const idx = p.deck.findIndex((c) => getCard(c.cardId).type === 'OBJET');
+      if (idx < 0) return { ok: false, error: 'Aucun objet dans ton deck.' };
+      const found = p.deck.splice(idx, 1)[0];
+      if (p.hand.length < MAX_HAND) p.hand.push(found);
+      else p.graveyard.push(found);
+      log(state, `Avarice récupère ${getCard(found.cardId).name} du deck.`, playerId);
+      return { ok: true };
+    }
+    case 'avocat_envie': {
+      // Renvoie l'invocation ciblée dans la main, et pose la 1re invocation jouable de la main.
+      if (!target) return { ok: false, error: 'Choisis une de tes invocations.' };
+      p.board = p.board.filter((c) => c.instanceId !== target.instanceId);
+      for (const eq of [...target.equipment]) removeEquipment(state, target, eq, true);
+      p.hand.push({ instanceId: target.instanceId, cardId: target.cardId });
+      const swapIdx = p.hand.findIndex((c) => getCard(c.cardId).type === 'INVOCATION' && !getCard(c.cardId).summoningConditions?.length && c.instanceId !== target.instanceId);
+      if (swapIdx >= 0) {
+        const inst = p.hand.splice(swapIdx, 1)[0];
+        const bc = makeBoardCard(state, inst.cardId, playerId, true);
+        bc.instanceId = inst.instanceId;
+        p.board.push(bc);
+        log(state, `Envie : ${cardDef(target).name} retourne en main, ${getCard(inst.cardId).name} arrive.`, playerId);
+      } else {
+        log(state, `Envie : ${cardDef(target).name} retourne en main.`, playerId);
+      }
+      recomputeAuras(state);
+      return { ok: true };
+    }
+    case 'floral_coup_pression': {
+      // Une invocation de rang C attaque une 2e fois ce tour, mais subit 30 dégâts.
+      if (!target) return { ok: false, error: 'Choisis une invocation de rang C.' };
+      if (cardDef(target).rank !== 'C') return { ok: false, error: 'Cible une invocation de rang C.' };
+      target.extraAttacks += 1;
+      log(state, `Coup de Pression : ${cardDef(target).name} pourra frapper une 2e fois (−30 PV).`, playerId);
+      dealDamage(state, target, 30, 'Coup de Pression');
+      return { ok: true };
+    }
     default:
       return { ok: false, error: 'Effet inconnu.' };
   }
@@ -833,7 +1013,7 @@ function attack(state: GameState, playerId: PlayerId, attackerId: string, target
   if (attacker.ownerId !== playerId) return { ok: false, error: "Cet attaquant ne t'appartient pas." };
   if (isSummoningSick(attacker)) return { ok: false, error: "Mal d'invocation : cette carte ne peut pas attaquer ce tour." };
   if (cannotAttack(attacker)) return { ok: false, error: 'Cette carte est empêchée d\'attaquer.' };
-  if (attacker.hasAttackedThisTurn) return { ok: false, error: 'Cette carte a déjà attaqué ce tour.' };
+  if (attacker.hasAttackedThisTurn && attacker.extraAttacks <= 0) return { ok: false, error: 'Cette carte a déjà attaqué ce tour.' };
   if (attackOf(attacker) <= 0) return { ok: false, error: "Cette carte n'a pas d'attaque." };
 
   const target = [foe.hero, ...foe.board].filter(Boolean).find((c) => c!.instanceId === targetId) as BoardCard | undefined;
@@ -846,7 +1026,8 @@ function attack(state: GameState, playerId: PlayerId, attackerId: string, target
   }
 
   const dmg = attackOf(attacker);
-  attacker.hasAttackedThisTurn = true;
+  if (attacker.hasAttackedThisTurn && attacker.extraAttacks > 0) attacker.extraAttacks -= 1;
+  else attacker.hasAttackedThisTurn = true;
   log(state, `${cardDef(attacker).name} attaque ${cardDef(target).name} (${dmg}).`, playerId);
   dealDamage(state, target, dmg, cardDef(attacker).attackName ?? 'Attaque');
   recomputeAuras(state);
@@ -859,6 +1040,12 @@ function attack(state: GameState, playerId: PlayerId, attackerId: string, target
 
 export function applyAction(state: GameState, playerId: PlayerId, action: GameAction): ActionResult {
   switch (action.type) {
+    case 'SETUP_PLACE':
+      return setupPlace(state, playerId, action.instanceId);
+    case 'SETUP_UNPLACE':
+      return setupUnplace(state, playerId, action.instanceId);
+    case 'SETUP_DONE':
+      return setupDone(state, playerId);
     case 'PLAY_CARD':
       return playCard(state, playerId, action.instanceId, action.targetInstanceId);
     case 'ATTACK':
@@ -884,7 +1071,13 @@ export function applyAction(state: GameState, playerId: PlayerId, action: GameAc
  *  Redaction (hide opponent's hidden information)
  * ------------------------------------------------------------------ */
 
+/** Strip a face-down board card of its identity for the opponent's view. */
+function maskCard(c: BoardCard): BoardCard {
+  return { ...c, cardId: '', hidden: true, modifiers: [], equipment: [] };
+}
+
 function redactPlayer(p: PlayerState, isYou: boolean): RedactedPlayerState {
+  const board = isYou ? p.board : p.board.map((c) => (c.hidden ? maskCard(c) : c));
   return {
     id: p.id,
     name: p.name,
@@ -892,12 +1085,13 @@ function redactPlayer(p: PlayerState, isYou: boolean): RedactedPlayerState {
     connected: p.connected,
     ready: p.ready,
     hero: p.hero,
-    board: p.board,
+    board,
     hand: isYou ? p.hand : p.hand.map(() => null),
     handCount: p.hand.length,
     deckCount: p.deck.length,
     graveyard: p.graveyard,
     sinsPlayed: p.sinsPlayed,
+    setupDone: p.setupDone,
   };
 }
 

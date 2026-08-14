@@ -65,15 +65,32 @@ client/   → @boloss/client : React + Vite + TypeScript + Tailwind + Zustand.
 
 ## 🚀 Démarrage (développement)
 
-Pré-requis : **Node 18+** (testé sur Node 22).
+Pré-requis : **Node 18+** (testé sur Node 22). Vérifie avec `node --version`.
+
+> ⚠️ **`npm install` est obligatoire avant tout.** Un repo téléchargé (zip GitHub)
+> ne contient pas `node_modules` : sans installation, `tsc`/`tsx` seront
+> « non reconnus ».
 
 ```bash
-npm install          # installe les 3 workspaces
-npm run dev          # build shared, puis lance server (:3001) + client (:5173)
+npm install          # 1) installe les 3 workspaces (obligatoire, ~1 min)
+npm run dev          # 2) build shared, puis lance server (:3001) + client (:5173)
 ```
 
 Ouvre <http://localhost:5173>, clique sur **Créer une partie**, copie le lien et
 ouvre-le dans un **second onglet / navigateur** pour incarner le second joueur.
+
+### 🪟 Windows / PowerShell
+
+PowerShell (l'ancien, celui par défaut) **ne comprend pas `&&`**. Tape les
+commandes **une par une**, chacune suivie de Entrée :
+
+```powershell
+npm install
+npm run build
+npm start
+```
+
+Puis ouvre <http://localhost:3001>. Pour arrêter : `Ctrl + C`.
 
 ### Scripts
 
@@ -94,10 +111,12 @@ Trois façons de tester à deux, de la plus simple à la plus durable :
 
 ### Option 1 — Réseau local (le plus rapide, gratuit)
 
-Sur ta machine :
+Sur ta machine (sous Windows PowerShell, tape-les une par une) :
 
 ```bash
-npm install && npm run build && npm start
+npm install
+npm run build
+npm start
 ```
 
 Trouve ton IP locale (`ipconfig` sur Windows, `ip a` / `ifconfig` sur Mac/Linux),

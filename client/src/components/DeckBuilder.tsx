@@ -12,6 +12,7 @@ import {
   type Faction,
 } from '@boloss/shared';
 import { cardImg } from '../lib/game';
+import { useInspectFactory } from '../lib/useInspect';
 
 const TYPE_LABELS: Record<CardType, string> = {
   HERO: 'Héros',
@@ -37,6 +38,7 @@ export default function DeckBuilder({
   const [deck, setDeck] = useState<string[]>(initial);
   const [faction, setFaction] = useState<Faction | 'all'>('all');
   const [query, setQuery] = useState('');
+  const { inspectFor, consumeLongPress } = useInspectFactory();
 
   const pool = useMemo(
     () =>
@@ -126,29 +128,32 @@ export default function DeckBuilder({
               const n = counts.get(c.id) ?? 0;
               const full = n >= maxCopiesOf(c.id) || deck.length >= DECK_SIZE;
               return (
-                <button
+                <div
                   key={c.id}
-                  onClick={() => add(c)}
-                  disabled={full}
+                  {...inspectFor(c.id)}
+                  onClick={() => {
+                    if (consumeLongPress()) return; // l'appui long ouvrait le zoom
+                    if (!full) add(c);
+                  }}
                   title={`${c.name} — ${TYPE_LABELS[c.type]} · Rang ${c.rank}`}
-                  className={`relative overflow-hidden rounded-md border-2 transition active:scale-95 ${
+                  className={`relative cursor-pointer overflow-hidden rounded-md border-2 transition active:scale-95 ${
                     n > 0 ? 'border-boloss-gold' : 'border-transparent'
                   } ${full ? 'opacity-40' : 'hover:border-white/40'}`}
                 >
-                  <img src={cardImg(c.image)} alt={c.name} className="aspect-[3/4] w-full object-cover" />
+                  <img src={cardImg(c.image)} alt={c.name} className="aspect-[3/4] w-full object-cover" draggable={false} />
                   {n > 0 && (
                     <span className="absolute right-0.5 top-0.5 rounded-full bg-boloss-gold px-1.5 text-[10px] font-bold text-black">
                       ×{n}
                     </span>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
           {pool.length === 0 && <div className="p-6 text-center text-sm text-white/40">Aucune carte trouvée.</div>}
         </div>
 
-        {/* Deck courant */}
+        {/* Deck courant (le zoom d'inspection est rendu au-dessus, cf. CardInspect) */}
         <div className="thin-scroll max-h-48 min-h-0 shrink-0 overflow-y-auto rounded-lg border border-white/10 bg-black/30 p-2 lg:max-h-none lg:w-72">
           <div className="mb-1 text-xs uppercase tracking-wide text-white/50">Deck ({deck.length})</div>
           {grouped.length === 0 && <div className="p-3 text-center text-xs text-white/40">Ajoute des cartes depuis la collection.</div>}

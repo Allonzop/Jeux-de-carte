@@ -18,6 +18,7 @@ import TargetingArrow from '../components/TargetingArrow';
 import LogPanel from '../components/LogPanel';
 import Lobby from '../components/Lobby';
 import SetupScreen from '../components/SetupScreen';
+import CardInspect from '../components/CardInspect';
 import { canAttackWith, cardBackImg, isYourTurn, legalAttackTargetIds, legalPlayTargetIds } from '../lib/game';
 
 export default function Play() {
@@ -63,10 +64,15 @@ export default function Play() {
     );
   }
 
-  if (game.status === 'LOBBY') return <Lobby game={game} />;
-  if (game.status === 'SETUP') return <SetupScreen game={game} />;
-
-  return <Board game={game} />;
+  return (
+    <>
+      {game.status === 'LOBBY' && <Lobby game={game} />}
+      {game.status === 'SETUP' && <SetupScreen game={game} />}
+      {(game.status === 'PLAYING' || game.status === 'FINISHED') && <Board game={game} />}
+      {/* Zoom d'inspection : disponible sur tous les écrans. */}
+      <CardInspect />
+    </>
+  );
 }
 
 function Board({ game }: { game: RedactedGameState }) {

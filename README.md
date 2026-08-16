@@ -167,7 +167,10 @@ variable d'environnement si besoin.
 - **Main** : 10 cartes max, l'excédent de pioche est défaussé.
 - **Plateau** : 1 HÉRO + 4 invocations max.
 - **Tour** : Début (pioche 2, effets de début) → Phase Principale → Phase de Combat → Fin (nettoyage des buffs temporaires).
-- **Mal d'invocation** : une invocation ne peut pas attaquer le tour où elle est posée (sauf *Charge*). Les invocations posées en mise en place dorment aussi pendant tout le 1er tour de leur propriétaire.
+- **Mal d'invocation** : une invocation ne peut pas attaquer le tour où elle est
+  posée (sauf *Charge*). Cela vaut aussi pour **le HÉROS et les invocations
+  posées en mise en place** : comme ils arrivent depuis la main, ils dorment
+  pendant tout le 1er tour de leur propriétaire et ne peuvent frapper qu'à son 2ᵉ tour.
 - **Provocation globale** : le HÉRO est **intouchable tant qu'il reste une seule
   invocation adverse** sur le plateau. Il faut nettoyer le terrain d'abord. Une
   carte avec le mot-clé *Provocation* reste prioritaire sur les autres invocations.
@@ -189,6 +192,19 @@ contrôle). Voir `shared/src/engine.ts`. Seule la carte-blague rang F
 (*Idée pour Contrer l'Ennui*) a un effet volontairement mineur (pioche 1).
 
 ---
+
+## 👁️ Lisibilité en jeu
+
+- **Zoom d'inspection** (façon Hearthstone) : survol de la souris ~0,5 s sur
+  desktop, **appui long** ~0,4 s sur mobile. Affiche la carte en grand avec son
+  nom, rang, type, PV/attaque courants, son attaque et sa description. Actif
+  partout : main, plateau, cimetière, deck builder.
+- **Effets actifs lisibles** : pastilles d'état sur les cartes du plateau
+  (🛡 provocation, ☠ poison, 💤 mal d'invocation, ⛔ bloquée, ⚔/❤ bonus),
+  badges chiffrés (`+80⚔`), et section **« Effets en cours »** dans le zoom qui
+  détaille chaque modificateur avec sa source et sa durée restante.
+- **Mulligan clair** : les cartes à échanger sont assombries avec une croix
+  rouge et un badge « ÉCHANGE » ; celles conservées gardent un liseré vert.
 
 ## 📱 Mobile & parties simultanées
 

@@ -88,4 +88,69 @@ export function cardStatus(card: BoardCard): CardStatus {
   };
 }
 
-export { attackOf, maxHp, getCard, OTHER };
+export interface ModifierLine {
+  icon: string;
+  text: string;
+  tone: 'good' | 'bad' | 'neutral';
+}
+
+/** Décrit en français les altérations d'état actives sur une carte du plateau. */
+export function describeModifiers(card: BoardCard): ModifierLine[] {
+  const lines: ModifierLine[] = [];
+  const def = getCard(card.cardId);
+
+  // Passifs issus de la carte elle-même.
+  for (const e of def.effects ?? []) {
+    if (e.trigger !== 'PASSIVE') continue;
+    const label = e.text ?? '';
+    if (e.action === 'TAUNT') lines.push({ icon: '🛡', text: 'Provocation — doit être attaquée en premier', tone: 'good' });
+    if (e.action === 'CHARGE') lines.push({ icon: '⚡', text: `${label || 'Charge'} — peut attaquer dès son arrivée`, tone: 'good' });
+    if (e.action === 'AURA_BUFF') lines.push({ icon: '✨', text: `${label || 'Aura'} — buff les alliés (+${e.value ?? 0} ATT / +${e.auraHp ?? 0} PV)`, tone: 'good' });
+    if (e.action === 'GAIN_ATTACK_PER_TURN') lines.push({ icon: '📈', text: `${label || 'Croissance'} — +${e.value ?? 0} attaque à chaque tour`, tone: 'good' });
+    if (e.action === 'COPY_ATTACK') lines.push({ icon: '🎭', text: `${label || 'Copie'} — égale l'attaque du plus fort adversaire`, tone: 'good' });
+  }
+
+  // Modificateurs dynamiques.
+  const turnsLabel = (t: number | null) => (t === null ? 'permanent' : `${t} tour${t > 1 ? 's' : ''}`);
+  for (const m of card.modifiers) {
+    const src = m.label ? ` (${m.label})` : '';
+    switch (m.kind) {
+      case 'ATTACK':
+        if (m.value)
+          lines.push({
+            icon: m.value > 0 ? '⚔️' : '🔻',
+            text: `${m.value > 0 ? '+' : ''}${m.value} attaque${src} · ${turnsLabel(m.remainingTurns)}`,
+            tone: m.value > 0 ? 'good' : 'bad',
+          });
+        break;
+      case 'HP':
+        if (m.value)
+          lines.push({
+            icon: m.value > 0 ? '❤️' : '💔',
+            text: `${m.value > 0 ? '+' : ''}${m.value} PV${src} · ${turnsLabel(m.remainingTurns)}`,
+            tone: m.value > 0 ? 'good' : 'bad',
+          });
+        break;
+      case 'POISON':
+        lines.push({ icon: '☠️', text: `Poison : −${m.value ?? 0} PV par tour${src} · ${turnsLabel(m.remainingTurns)}`, tone: 'bad' });
+        break;
+      case 'CANNOT_ATTACK':
+        lines.push({ icon: '⛔', text: `Ne peut pas attaquer${src} · ${turnsLabel(m.remainingTurns)}`, tone: 'bad' });
+        break;
+      default:
+        break;
+    }
+  }
+
+  // États de combat.
+  if (isSummoningSick(card)) lines.push({ icon: '💤', text: "Mal d'invocation — ne peut pas attaquer ce tour", tone: 'bad' });
+  if (card.hasAttackedThisTurn && card.extraAttacks <= 0) lines.push({ icon: '✅', text: 'A déjà attaqué ce tour', tone: 'neutral' });
+  if (card.extraAttacks > 0) lines.push({ icon: '🔁', text: `${card.extraAttacks} attaque(s) supplémentaire(s) ce tour`, tone: 'good' });
+  for (const eq of card.equipment) {
+    lines.push({ icon: '⚙️', text: `Équipé : ${getCard(eq.cardId).name}`, tone: 'neutral' });
+  }
+
+  return lines;
+}
+
+export { attackOf, maxHp, getCard, OTHER, isSummoningSick };

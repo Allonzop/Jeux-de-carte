@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { BoardCard } from '@boloss/shared';
-import { attackOf, cardImg, cardBackImg, cardStatus, getCard, maxHp } from '../lib/game';
+import { attackOf, cardImg, cardBackImg, cardStatus, describeModifiers, getCard, maxHp } from '../lib/game';
+import { useInspect } from '../lib/useInspect';
 
 export type Highlight = 'none' | 'playable' | 'target' | 'selected' | 'attacker';
 
@@ -15,6 +16,10 @@ interface Props {
   anchorKey?: string; // data attribute name for targeting arrow anchoring
   anchorId?: string;
   title?: string;
+  /** Marquée pour l'échange (mulligan) : croix rouge + assombrissement. */
+  marked?: boolean;
+  /** Désactive le zoom d'inspection (ex: vignettes du deck builder). */
+  noInspect?: boolean;
 }
 
 // Tailles pensées mobile-first : compactes sur petit écran, confortables ensuite.
@@ -49,9 +54,12 @@ export default function CardView({
   anchorKey,
   anchorId,
   title,
+  marked,
+  noInspect,
 }: Props) {
   const def = useMemo(() => (cardId ? getCard(cardId) : undefined), [cardId]);
   const anchorProps = anchorKey && anchorId ? { [`data-${anchorKey}`]: anchorId } : {};
+  const { handlers: inspectHandlers, consumeLongPress } = useInspect(noInspect ? undefined : cardId, board);
 
   // Floating damage / heal number when a board card's HP changes.
   const [float, setFloat] = useState<{ n: number; heal: boolean; key: number } | null>(null);
@@ -91,15 +99,28 @@ export default function CardView({
   const curHp = board ? board.hp : def.baseHp ?? 0;
   const maxH = board ? maxHp(board) : def.baseHp ?? 0;
   const curAtk = board ? attackOf(board) : def.baseAttack ?? 0;
+  // Résumé texte des effets : sert d'infobulle native au survol.
+  const modLines = board ? describeModifiers(board) : [];
+  const tooltip = title ?? [def.name, ...modLines.map((l) => `${l.icon} ${l.text}`)].join('\n');
 
   return (
     <button
       type="button"
-      onClick={onClick}
-      title={title ?? def.name}
-      disabled={!onClick}
+      onClick={() => {
+        // Un appui long vient d'ouvrir le zoom : on n'exécute pas l'action.
+        if (consumeLongPress()) return;
+        onClick?.();
+      }}
+      title={tooltip}
+      // Le zoom doit rester accessible même sur une carte non cliquable.
+      disabled={false}
       {...anchorProps}
-      className={`card-frame group relative ${SIZES[size]} aspect-[3/4] overflow-hidden shadow-card transition-transform duration-150 disabled:cursor-default ${HIGHLIGHT[highlight]} ${dimmed ? 'opacity-60 grayscale' : ''} ${shake ? 'animate-shake' : ''} animate-pop`}
+      {...inspectHandlers}
+      className={`card-frame group relative ${SIZES[size]} aspect-[3/4] overflow-hidden shadow-card transition-transform duration-150 ${
+        onClick ? '' : 'cursor-default'
+      } ${HIGHLIGHT[highlight]} ${dimmed ? 'opacity-60 grayscale' : ''} ${marked ? 'brightness-[0.45]' : ''} ${
+        shake ? 'animate-shake' : ''
+      } animate-pop`}
     >
       <img src={cardImg(def.image)} alt={def.name} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
 
@@ -122,13 +143,43 @@ export default function CardView({
         </>
       )}
 
-      {/* Status pips. */}
+      {/* Pastilles d'état — lisibles d'un coup d'œil sur le plateau. */}
       {status && (
         <div className="absolute right-0 top-0 flex flex-col items-end gap-0.5 p-0.5">
           {status.taunt && <Pip title="Provocation" className="bg-sky-500">🛡</Pip>}
-          {status.poison && <Pip title="Poison" className="bg-lime-600">☠</Pip>}
+          {status.poison && <Pip title="Empoisonnée" className="bg-lime-600">☠</Pip>}
           {status.sick && <Pip title="Mal d'invocation" className="bg-zinc-500">💤</Pip>}
           {status.locked && <Pip title="Ne peut pas attaquer" className="bg-red-700">⛔</Pip>}
+          {status.attackBuff > 0 && (
+            <Pip title={`+${status.attackBuff} attaque`} className="bg-amber-500">⚔</Pip>
+          )}
+          {status.hpBuff > 0 && <Pip title={`+${status.hpBuff} PV`} className="bg-emerald-600">❤</Pip>}
+        </div>
+      )}
+
+      {/* Bandeau des bonus chiffrés (rendu très lisible même en petit). */}
+      {status && (status.attackBuff !== 0 || status.hpBuff !== 0) && (
+        <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center gap-1">
+          {status.attackBuff !== 0 && (
+            <span
+              className={`rounded px-1 text-[10px] font-bold shadow ${
+                status.attackBuff > 0 ? 'bg-amber-400 text-black' : 'bg-red-700 text-white'
+              }`}
+            >
+              {status.attackBuff > 0 ? '+' : ''}
+              {status.attackBuff}⚔
+            </span>
+          )}
+          {status.hpBuff !== 0 && (
+            <span
+              className={`rounded px-1 text-[10px] font-bold shadow ${
+                status.hpBuff > 0 ? 'bg-emerald-400 text-black' : 'bg-red-700 text-white'
+              }`}
+            >
+              {status.hpBuff > 0 ? '+' : ''}
+              {status.hpBuff}❤
+            </span>
+          )}
         </div>
       )}
 
@@ -136,6 +187,16 @@ export default function CardView({
       {board && board.equipment.length > 0 && (
         <div className="absolute bottom-0 left-0 rounded-tr-md bg-black/75 px-1 text-[10px] text-boloss-gold">
           ⚙{board.equipment.length}
+        </div>
+      )}
+
+      {/* Marquage mulligan : la carte part à l'échange. */}
+      {marked && (
+        <div className="absolute inset-0 flex items-center justify-center bg-boloss-red/35 ring-4 ring-inset ring-boloss-red">
+          <span className="font-display text-4xl leading-none text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.9)]">✕</span>
+          <span className="absolute bottom-1 rounded bg-boloss-red px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+            échange
+          </span>
         </div>
       )}
 

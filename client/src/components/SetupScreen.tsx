@@ -101,18 +101,32 @@ export default function SetupScreen({ game }: { game: RedactedGameState }) {
         {step === 'MULLIGAN' && (
           <div className="flex w-full max-w-md flex-col items-center gap-2 rounded-xl border border-white/10 bg-felt-800/95 p-3 shadow-lg backdrop-blur">
             <p className="text-center text-xs text-white/70">
-              Sélectionne les cartes à échanger contre de nouvelles de ton deck (facultatif).
+              Touche les cartes que tu veux <b className="text-boloss-red">jeter</b> — elles seront remplacées par
+              d'autres de ton deck.
             </p>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span className="flex items-center gap-1 text-red-300">
+                <span className="inline-block h-3 w-3 rounded-sm bg-boloss-red" /> ✕ échangée
+              </span>
+              <span className="flex items-center gap-1 text-emerald-300">
+                <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-emerald-400" /> gardée
+              </span>
+            </div>
             <div className="flex w-full gap-2">
               <button
                 onClick={() => mulligan([...swap])}
-                className="flex-1 rounded-lg bg-boloss-gold px-4 py-3 font-semibold text-black transition active:scale-95"
+                className={`flex-1 rounded-lg px-4 py-3 font-semibold transition active:scale-95 ${
+                  swap.size > 0 ? 'bg-boloss-red text-white' : 'bg-boloss-gold text-black'
+                }`}
               >
-                {swap.size > 0 ? `Échanger ${swap.size} carte(s)` : 'Garder ma main'}
+                {swap.size > 0 ? `Échanger ${swap.size} carte(s) ↻` : 'Garder toute ma main ✓'}
               </button>
               {swap.size > 0 && (
-                <button onClick={() => setSwap(new Set())} className="rounded-lg border border-white/20 px-3 py-3 text-sm text-white/70">
-                  Annuler
+                <button
+                  onClick={() => setSwap(new Set())}
+                  className="rounded-lg border border-white/20 px-3 py-3 text-sm text-white/70 active:scale-95"
+                >
+                  Tout garder
                 </button>
               )}
             </div>
@@ -161,15 +175,23 @@ export default function SetupScreen({ game }: { game: RedactedGameState }) {
                 : step === 'HERO'
                   ? () => chooseHero(inst.instanceId)
                   : () => setupPlace(inst.instanceId);
+            // Pendant le mulligan : croix rouge sur les cartes jetées, liseré
+            // vert sur celles qu'on garde — l'état se lit instantanément.
+            const mulliganKept = step === 'MULLIGAN' && !selected;
             return (
-              <CardView
+              <div
                 key={inst.instanceId}
-                cardId={inst.cardId}
-                size="lg"
-                highlight={selected ? 'selected' : selectable ? 'playable' : 'none'}
-                dimmed={!selectable}
-                onClick={onClick}
-              />
+                className={`rounded-lg transition ${mulliganKept ? 'ring-2 ring-emerald-400/80' : ''}`}
+              >
+                <CardView
+                  cardId={inst.cardId}
+                  size="lg"
+                  marked={selected}
+                  highlight={step === 'MULLIGAN' ? 'none' : selectable ? 'playable' : 'none'}
+                  dimmed={!selectable && step !== 'MULLIGAN'}
+                  onClick={onClick}
+                />
+              </div>
             );
           })}
         </div>

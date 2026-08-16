@@ -3,6 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import {
   getCard,
   getPlayRequirement,
+  type BoardCard,
   type Faction,
   type GameAction,
   type PlayerId,
@@ -27,6 +28,8 @@ interface StoreState {
   error: string | null;
   interaction: Interaction;
   pointer: { x: number; y: number };
+  /** Carte affichée en grand (survol prolongé sur desktop, appui long sur mobile). */
+  inspect: { cardId: string; board?: BoardCard } | null;
 
   connect: (roomId: string, name?: string) => void;
   disconnect: () => void;
@@ -52,6 +55,8 @@ interface StoreState {
 
   setPointer: (x: number, y: number) => void;
   clearError: () => void;
+  showInspect: (cardId: string, board?: BoardCard) => void;
+  hideInspect: () => void;
 }
 
 function tokenKey(roomId: string) {
@@ -67,6 +72,7 @@ export const useStore = create<StoreState>((set, get) => ({
   error: null,
   interaction: { mode: 'idle' },
   pointer: { x: 0, y: 0 },
+  inspect: null,
 
   connect: (roomId, name) => {
     if (get().socket) return;
@@ -169,4 +175,6 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setPointer: (x, y) => set({ pointer: { x, y } }),
   clearError: () => set({ error: null }),
+  showInspect: (cardId, board) => set({ inspect: { cardId, board } }),
+  hideInspect: () => set({ inspect: null }),
 }));

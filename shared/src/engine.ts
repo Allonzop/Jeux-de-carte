@@ -251,7 +251,10 @@ export function chooseHero(state: GameState, playerId: PlayerId, instanceId: str
     return { ok: false, error: 'Seule une invocation sans condition peut devenir ton héros.' };
   }
   p.hand.splice(idx, 1);
-  const hero = makeBoardCard(state, inst.cardId, playerId, false);
+  // Le héros est posé depuis la main comme n'importe quelle invocation : il subit
+  // donc le mal d'invocation et ne peut pas attaquer pendant le 1er tour de son
+  // propriétaire (le flag n'est levé qu'à partir de son 2e tour, cf. beginTurn).
+  const hero = makeBoardCard(state, inst.cardId, playerId, /* summonedThisTurn */ true);
   hero.instanceId = inst.instanceId;
   hero.isHero = true;
   p.hero = hero;

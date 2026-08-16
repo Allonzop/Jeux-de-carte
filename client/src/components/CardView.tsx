@@ -20,7 +20,29 @@ interface Props {
   marked?: boolean;
   /** Désactive le zoom d'inspection (ex: vignettes du deck builder). */
   noInspect?: boolean;
+  /** Animation d'entrée en scène : pioche, pose sur le plateau, ou simple pop. */
+  enter?: EnterAnim;
+  /** Décalage de l'entrée, pour distribuer la main carte par carte (ms). */
+  enterDelay?: number;
+  /** Horodatage de la dernière attaque portée par cette carte (déclencheur). */
+  attackAt?: number;
+  /** Sens de la charge : vers le haut (mon camp) ou vers le bas (l'adversaire). */
+  attackDir?: 'up' | 'down';
+  /** La carte vient de mourir : elle joue sa disparition avant d'être retirée. */
+  dying?: boolean;
 }
+
+export type EnterAnim = 'pop' | 'deal' | 'slam' | 'none';
+
+/** Classe + durée de chaque animation d'entrée (la durée sert à la désactiver). */
+const ENTER: Record<EnterAnim, { cls: string; ms: number }> = {
+  pop: { cls: 'animate-pop', ms: 200 },
+  deal: { cls: 'animate-dealIn', ms: 440 },
+  slam: { cls: 'animate-slamIn', ms: 440 },
+  none: { cls: '', ms: 0 },
+};
+
+const LUNGE_MS = 460;
 
 // Tailles pensées mobile-first : compactes sur petit écran, confortables ensuite.
 const SIZES: Record<NonNullable<Props['size']>, string> = {
@@ -56,6 +78,11 @@ export default function CardView({
   title,
   marked,
   noInspect,
+  enter = 'pop',
+  enterDelay = 0,
+  attackAt,
+  attackDir = 'up',
+  dying,
 }: Props) {
   const def = useMemo(() => (cardId ? getCard(cardId) : undefined), [cardId]);
   const anchorProps = anchorKey && anchorId ? { [`data-${anchorKey}`]: anchorId } : {};
@@ -82,6 +109,38 @@ export default function CardView({
     }
     prevHp.current = hp;
   }, [board?.hp]);
+
+  // L'animation d'entrée n'est portée que le temps de se jouer : une fois finie
+  // on retire la classe, sinon son `fill: both` figerait la transformation et
+  // bloquerait le survol (et elle repartirait à la moindre autre animation).
+  const [entered, setEntered] = useState(enter === 'none');
+  useEffect(() => {
+    if (enter === 'none') return;
+    const t = setTimeout(() => setEntered(true), ENTER[enter].ms + enterDelay);
+    return () => clearTimeout(t);
+  }, [enter, enterDelay]);
+
+  // Charge vers l'adversaire, rejouée à chaque nouvelle attaque de cette carte.
+  const [lunging, setLunging] = useState(false);
+  useEffect(() => {
+    if (!attackAt) return;
+    setLunging(true);
+    const t = setTimeout(() => setLunging(false), LUNGE_MS);
+    return () => clearTimeout(t);
+  }, [attackAt]);
+
+  // Une seule animation à la fois : `animation` n'est pas cumulable en CSS.
+  const anim = dying
+    ? 'animate-deathPuff'
+    : lunging
+      ? attackDir === 'down'
+        ? 'animate-lungeDown'
+        : 'animate-lungeUp'
+      : shake
+        ? 'animate-shake'
+        : entered
+          ? ''
+          : ENTER[enter].cls;
 
   if (faceDown || !def) {
     return (
@@ -116,13 +175,20 @@ export default function CardView({
       disabled={false}
       {...anchorProps}
       {...inspectHandlers}
+      style={enterDelay && !entered ? { animationDelay: `${enterDelay}ms` } : undefined}
       className={`card-frame group relative ${SIZES[size]} aspect-[3/4] overflow-hidden shadow-card transition-transform duration-150 ${
         onClick ? '' : 'cursor-default'
-      } ${HIGHLIGHT[highlight]} ${dimmed ? 'opacity-60 grayscale' : ''} ${marked ? 'brightness-[0.45]' : ''} ${
-        shake ? 'animate-shake' : ''
-      } animate-pop`}
+      } ${HIGHLIGHT[highlight]} ${dimmed ? 'opacity-60 grayscale' : ''} ${marked ? 'brightness-[0.45]' : ''} ${anim}`}
     >
       <img src={cardImg(def.image)} alt={def.name} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+
+      {/* Éclair doré à l'instant où la carte claque sur le plateau. */}
+      {enter === 'slam' && !entered && (
+        <span
+          className="pointer-events-none absolute inset-0 animate-slamFlash bg-boloss-gold mix-blend-screen"
+          style={enterDelay ? { animationDelay: `${enterDelay}ms` } : undefined}
+        />
+      )}
 
       {/* Live stat overlays for creatures on the board. */}
       {isCreature && (

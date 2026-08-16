@@ -193,6 +193,62 @@ contrôle). Voir `shared/src/engine.ts`. Seule la carte-blague rang F
 
 ---
 
+## 🎨 Identité visuelle
+
+### Le logo
+
+Le mot « BOLOSS » n'est plus écrit en dur nulle part : tous les emplacements
+(accueil, salon, barre de jeu, écran de chargement) passent par le composant
+[`client/src/components/Logo.tsx`](client/src/components/Logo.tsx).
+
+**Pour mettre ton logo :** dépose le fichier ici, sous le nom `logo` —
+
+```
+client/src/assets/brand/logo.png      ← ou .webp / .jpg / .svg
+```
+
+…et c'est tout. Le composant le détecte **au build** (`import.meta.glob`), il
+apparaît partout, et le **ratio est préservé** : chaque emplacement impose une
+hauteur, la largeur suit (`object-contain`). Tant qu'aucun fichier n'est
+présent, un logo typographique de secours prend le relais — rien ne casse.
+Voir [`client/src/assets/brand/README.md`](client/src/assets/brand/README.md)
+pour les recommandations (fond transparent, format paysage).
+
+### L'écran de chargement
+
+Au premier chargement d'un onglet, un overlay noir présente le logo :
+apparition en fondu, montée en tension, puis **un rebond marqué
+(`Ease.OutBounce`) dont le dernier impact tombe exactement sur la fin du
+morceau** `client/src/assets/brand/intro.mp3` — flash blanc, onde de choc et
+secousse d'écran à chaque contact.
+
+La synchronisation n'est pas codée en dur : la chronologie est **calée sur
+`audio.duration`** et l'animation est pilotée par `audio.currentTime`. Si la
+lecture démarre en retard, c'est l'image qui se recale sur le son. Remplace le
+MP3 par un autre extrait et l'animation s'ajuste toute seule.
+
+Détails : l'intro ne se joue **qu'une fois par session** (onglet), se passe d'un
+clic / d'une touche, propose un bouton 🔇 mémorisé, et est **entièrement
+désactivée** si le système demande `prefers-reduced-motion`. Si le navigateur
+refuse la lecture audio automatique (politique d'autoplay), l'écran propose
+« ▶ touche l'écran » puis démarre en silence après 4 s.
+
+### Animations de jeu
+
+Purement cosmétiques — le moteur et les définitions de cartes ne changent pas.
+Tout passe par des keyframes CSS déclarées dans `client/tailwind.config.js`, et
+les évènements sont déduits en comparant deux états successifs du serveur
+([`client/src/lib/fx.ts`](client/src/lib/fx.ts)).
+
+| Moment | Effet |
+|---|---|
+| **Pioche** | Les cartes sont distribuées une par une, en arrivant par le bas |
+| **Pose sur le plateau** | La carte s'écrase depuis le haut, avec un éclair doré à l'impact |
+| **Attaque** | L'attaquant recule puis charge vers l'adversaire |
+| **Dégâts** | La cible tremble, le chiffre de dégâts s'envole |
+| **Destruction** | La carte blanchit et se dissipe **à l'endroit exact** où elle était |
+| **Changement de tour** | Bandeau « À TOI DE JOUER » qui balaie l'écran |
+
 ## 👁️ Lisibilité en jeu
 
 - **Zoom d'inspection** (façon Hearthstone) : survol de la souris ~0,5 s sur
@@ -221,6 +277,6 @@ contrôle). Voir `shared/src/engine.ts`. Seule la carte-blague rang F
 
 ## 🗺️ Suite (jalons futurs)
 
-- Effets de combat plus riches (animations d'attaque, sons).
+- Sons en jeu (impact d'attaque, pioche, victoire) en plus de la musique d'intro.
 - Persistance des parties / spectateurs / reconnexion longue durée.
 - Sauvegarde des decks personnalisés entre les sessions.

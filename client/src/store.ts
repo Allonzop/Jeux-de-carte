@@ -9,6 +9,7 @@ import {
   type PlayerId,
   type RedactedGameState,
 } from '@boloss/shared';
+import { detectAttack, type AttackFx } from './lib/fx';
 
 const SERVER_URL: string =
   (import.meta.env.VITE_SERVER_URL as string | undefined) ||
@@ -30,6 +31,8 @@ interface StoreState {
   pointer: { x: number; y: number };
   /** Carte affichée en grand (survol prolongé sur desktop, appui long sur mobile). */
   inspect: { cardId: string; board?: BoardCard } | null;
+  /** Dernière attaque repérée entre deux états — sert à animer la charge. */
+  lastAttack: AttackFx | null;
 
   connect: (roomId: string, name?: string) => void;
   disconnect: () => void;
@@ -73,6 +76,7 @@ export const useStore = create<StoreState>((set, get) => ({
   interaction: { mode: 'idle' },
   pointer: { x: 0, y: 0 },
   inspect: null,
+  lastAttack: null,
 
   connect: (roomId, name) => {
     if (get().socket) return;
@@ -97,14 +101,16 @@ export const useStore = create<StoreState>((set, get) => ({
     socket.on('actionError', (payload: { error: string }) => set({ error: payload.error }));
 
     socket.on('state', (game: RedactedGameState) => {
-      set({ game, interaction: { mode: 'idle' } });
+      // Comparaison avec l'état précédent pour savoir quoi animer.
+      const attack = detectAttack(get().game, game);
+      set({ game, interaction: { mode: 'idle' }, ...(attack ? { lastAttack: attack } : {}) });
     });
   },
 
   disconnect: () => {
     const { socket } = get();
     socket?.disconnect();
-    set({ socket: null, connected: false, game: null, you: null, interaction: { mode: 'idle' } });
+    set({ socket: null, connected: false, game: null, you: null, interaction: { mode: 'idle' }, lastAttack: null });
   },
 
   setFaction: (faction) => get().socket?.emit('setFaction', { faction }),

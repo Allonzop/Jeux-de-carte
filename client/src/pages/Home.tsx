@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Logo from '../components/Logo';
 
 function shortId(): string {
   // Short, URL-friendly room id.
@@ -21,8 +22,10 @@ export default function Home() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center justify-center gap-8 px-4 py-12 text-center">
-      <div>
-        <h1 className="font-display text-7xl text-boloss-gold drop-shadow-[0_3px_0_rgba(0,0,0,0.4)]">BOLOSS</h1>
+      <div className="flex flex-col items-center">
+        <h1 className="flex justify-center">
+          <Logo size="hero" />
+        </h1>
         <p className="mt-1 text-lg text-white/70">Le jeu de cartes 1 contre 1. Pas de compte, juste un lien.</p>
       </div>
 

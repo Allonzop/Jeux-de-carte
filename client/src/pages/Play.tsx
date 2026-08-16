@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   evaluateConditions,
@@ -19,6 +19,7 @@ import LogPanel from '../components/LogPanel';
 import Lobby from '../components/Lobby';
 import SetupScreen from '../components/SetupScreen';
 import CardInspect from '../components/CardInspect';
+import Logo from '../components/Logo';
 import { canAttackWith, cardBackImg, isYourTurn, legalAttackTargetIds, legalPlayTargetIds } from '../lib/game';
 
 export default function Play() {
@@ -56,8 +57,8 @@ export default function Play() {
   if (!game || !you) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="font-display text-4xl text-boloss-gold">BOLOSS</div>
+        <div className="flex flex-col items-center text-center">
+          <Logo size="title" className="animate-pulse" />
           <p className="mt-2 text-white/60">{connected ? 'Connexion à la partie…' : 'Connexion au serveur…'}</p>
         </div>
       </div>
@@ -90,6 +91,7 @@ function Board({ game }: { game: RedactedGameState }) {
   const error = useStore((s) => s.error);
 
   const myTurn = isYourTurn(game);
+  const banner = useTurnBanner(game);
 
   // ---- Derived interaction sets ----------------------------------------
   const playTargets = useMemo(() => {
@@ -212,10 +214,52 @@ function Board({ game }: { game: RedactedGameState }) {
         </div>
       )}
 
+      {/* Changement de tour : bandeau qui balaie l'écran. */}
+      {banner && (
+        <div className="pointer-events-none fixed inset-x-0 top-1/3 z-40 flex justify-center">
+          <div
+            className={`animate-turnBanner rounded-xl border-2 px-6 py-2 font-display text-3xl tracking-wider shadow-2xl sm:px-10 sm:py-3 sm:text-5xl ${
+              banner.mine
+                ? 'border-boloss-gold/60 bg-black/75 text-boloss-gold'
+                : 'border-white/15 bg-black/70 text-white/70'
+            }`}
+          >
+            {banner.text}
+          </div>
+        </div>
+      )}
+
       <TargetingArrow />
       {game.status === 'FINISHED' && <GameOver game={game} />}
     </div>
   );
+}
+
+/** Annonce le passage de main, une fois par changement de joueur actif. */
+function useTurnBanner(game: RedactedGameState): { text: string; mine: boolean } | null {
+  const [banner, setBanner] = useState<{ text: string; mine: boolean } | null>(null);
+  const prev = useRef<PlayerId | null>(null);
+
+  useEffect(() => {
+    if (game.status !== 'PLAYING') return;
+    const before = prev.current;
+    prev.current = game.activePlayer;
+    // Rien à l'entrée en partie : on n'annonce que les changements.
+    if (before === null || before === game.activePlayer) return;
+    const mine = game.activePlayer === game.you;
+    setBanner({ text: mine ? 'À TOI DE JOUER' : 'TOUR ADVERSE', mine });
+  }, [game.activePlayer, game.status, game.you]);
+
+  // Effacement piloté par le bandeau lui-même : si on le suspendait à l'effet
+  // ci-dessus, la fin de partie (changement de `status`) annulerait le minuteur
+  // par son nettoyage et le bandeau resterait collé à l'écran.
+  useEffect(() => {
+    if (!banner) return;
+    const t = setTimeout(() => setBanner(null), 1700);
+    return () => clearTimeout(t);
+  }, [banner]);
+
+  return banner;
 }
 
 /* ---------------------------------------------------------------- */
@@ -228,7 +272,7 @@ function TopBar({ game }: { game: RedactedGameState }) {
   const myTurn = isYourTurn(game);
   return (
     <div className="flex items-center justify-between gap-2 px-2 py-1.5 sm:px-4 sm:py-2">
-      <div className="font-display text-lg text-boloss-gold sm:text-2xl">BOLOSS</div>
+      <Logo size="bar" className="max-w-[38vw] sm:max-w-[220px]" />
       <div className="hidden items-center gap-4 text-sm md:flex">
         <span className="text-white/70">
           {me.name} <span className="text-white/40">({me.faction ? FACTION_LABELS[me.faction] : 'deck perso'})</span>
@@ -260,6 +304,13 @@ function PlayerField({
   charHighlight: (c: BoardCard) => Highlight;
   charClick: (c: BoardCard) => (() => void) | undefined;
 }) {
+  const lastAttack = useStore((s) => s.lastAttack);
+  const dir: 'up' | 'down' = isFoe ? 'down' : 'up';
+  const swungAt = (c: BoardCard) => (lastAttack?.from === c.instanceId ? lastAttack.at : undefined);
+
+  // Les invocations qui viennent de mourir rejouent leur disparition à l'endroit
+  // exact où elles se trouvaient, sans perturber la remise en page du plateau.
+  const ghosts = useDeathGhosts(player.board);
   const slots: (BoardCard | null)[] = [];
   for (let i = 0; i < MAX_BOARD; i++) slots.push(player.board[i] ?? null);
 
@@ -298,6 +349,9 @@ function PlayerField({
             onClick={charClick(hero)}
             anchorKey="char"
             anchorId={hero.instanceId}
+            enter="slam"
+            attackAt={swungAt(hero)}
+            attackDir={dir}
           />
         ) : (
           <EmptySlot label="Héro" />
@@ -318,14 +372,81 @@ function PlayerField({
               onClick={charClick(c)}
               anchorKey="char"
               anchorId={c.instanceId}
+              enter="slam"
+              attackAt={swungAt(c)}
+              attackDir={dir}
             />
           ) : (
             <EmptySlot key={`e${i}`} />
           ),
         )}
       </div>
+
+      {/* Fantômes des cartes détruites, figés à leur dernière position. */}
+      {ghosts.map((g) => (
+        <div
+          key={g.card.instanceId}
+          className="pointer-events-none fixed z-30"
+          style={{ left: g.rect.left, top: g.rect.top, width: g.rect.width, height: g.rect.height }}
+        >
+          <CardView cardId={g.card.cardId} board={g.card} size="md" enter="none" dying noInspect />
+        </div>
+      ))}
     </div>
   );
+}
+
+interface Ghost {
+  card: BoardCard;
+  rect: DOMRect;
+  /** Instant de retrait : le nettoyage ne dépend pas des mises à jour du plateau. */
+  expires: number;
+}
+
+const DEATH_MS = 470;
+
+/**
+ * Retient une demi-seconde les invocations qui viennent de quitter le plateau,
+ * avec la position qu'elles occupaient juste avant, pour jouer leur mort.
+ */
+function useDeathGhosts(board: BoardCard[]): Ghost[] {
+  const rects = useRef<Map<string, DOMRect>>(new Map());
+  const prev = useRef<BoardCard[]>([]);
+  const [ghosts, setGhosts] = useState<Ghost[]>([]);
+
+  useLayoutEffect(() => {
+    const live = new Set(board.map((c) => c.instanceId));
+    const gone = prev.current.filter((c) => !live.has(c.instanceId));
+    prev.current = board;
+
+    // On lit le cache AVANT de le rafraîchir : il contient encore la position
+    // qu'occupait la carte au rendu précédent.
+    const fresh = gone
+      .map((card) => ({ card, rect: rects.current.get(card.instanceId), expires: Date.now() + DEATH_MS }))
+      .filter((g): g is Ghost => !!g.rect);
+    for (const c of gone) rects.current.delete(c.instanceId);
+    for (const c of board) {
+      const el = document.querySelector(`[data-char="${c.instanceId}"]`);
+      if (el) rects.current.set(c.instanceId, el.getBoundingClientRect());
+    }
+
+    if (fresh.length > 0) setGhosts((g) => [...g, ...fresh]);
+  }, [board]);
+
+  // Retrait piloté par les fantômes eux-mêmes. Le plateau change à chaque
+  // message du serveur : accrocher le minuteur à l'effet ci-dessus le ferait
+  // annuler par son propre nettoyage, et le fantôme resterait à l'écran.
+  useEffect(() => {
+    if (ghosts.length === 0) return;
+    const soonest = Math.min(...ghosts.map((g) => g.expires));
+    const t = setTimeout(
+      () => setGhosts((g) => g.filter((x) => x.expires > Date.now())),
+      Math.max(20, soonest - Date.now()),
+    );
+    return () => clearTimeout(t);
+  }, [ghosts]);
+
+  return ghosts;
 }
 
 function EmptySlot({ label }: { label?: string }) {
@@ -373,6 +494,18 @@ function Hand({
   interaction: ReturnType<typeof useStore.getState>['interaction'];
   onPlay: (id: string) => void;
 }) {
+  // Les cartes qui viennent d'arriver sont distribuées l'une après l'autre :
+  // on retient celles déjà vues pour ne décaler que les nouvelles.
+  const seen = useRef<Set<string>>(new Set());
+  const delays = new Map<string, number>();
+  let fresh = 0;
+  for (const inst of hand) {
+    if (inst && !seen.current.has(inst.instanceId)) delays.set(inst.instanceId, Math.min(fresh++, 9) * 55);
+  }
+  useEffect(() => {
+    for (const inst of hand) if (inst) seen.current.add(inst.instanceId);
+  });
+
   return (
     <div className="thin-scroll flex min-h-[7rem] items-end gap-1 overflow-x-auto px-2 pb-2 pt-1 sm:min-h-[9.5rem] sm:justify-center sm:px-4 sm:pb-3">
       {hand.length === 0 && <div className="w-full pb-6 text-center text-sm text-white/40">Main vide</div>}
@@ -383,7 +516,7 @@ function Hand({
         return (
           <div
             key={inst.instanceId}
-            className="shrink-0 transition-transform"
+            className="shrink-0 transition-transform duration-200 hover:-translate-y-1"
             style={{ marginLeft: i === 0 ? 0 : undefined }}
           >
             <CardView
@@ -394,6 +527,8 @@ function Hand({
               onClick={isPlayable || isSelected ? () => onPlay(inst.instanceId) : undefined}
               anchorKey="hand"
               anchorId={inst.instanceId}
+              enter="deal"
+              enterDelay={delays.get(inst.instanceId) ?? 0}
             />
           </div>
         );

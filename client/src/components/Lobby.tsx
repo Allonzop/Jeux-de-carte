@@ -11,6 +11,7 @@ import {
 import { cardImg } from '../lib/game';
 import { useStore } from '../store';
 import DeckBuilder from './DeckBuilder';
+import Logo from './Logo';
 
 export default function Lobby({ game }: { game: RedactedGameState }) {
   const you = game.you;
@@ -55,7 +56,9 @@ export default function Lobby({ game }: { game: RedactedGameState }) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
       <header className="text-center">
-        <h1 className="font-display text-5xl text-boloss-gold drop-shadow">BOLOSS</h1>
+        <h1 className="flex justify-center">
+          <Logo size="title" />
+        </h1>
         <p className="text-white/70">Choisis ta faction, puis clique sur « Prêt ».</p>
       </header>
 

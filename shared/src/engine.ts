@@ -34,7 +34,7 @@ import type {
   TargetType,
 } from './types';
 import { getCard, SIN_IDS } from './cards';
-import { buildDeck, shuffle } from './deck';
+import { buildDeck, isBasicInvocationId, shuffle, validateDeck } from './deck';
 import { DRAW_PER_TURN, MAX_BOARD, MAX_HAND, MAX_SETUP_INVOCATIONS, OPENING_HAND } from './constants';
 
 export interface ActionResult {
@@ -62,7 +62,9 @@ function emptyPlayer(id: PlayerId, name: string): PlayerState {
     graveyard: [],
     sinsPlayed: [],
     setupDone: false,
+    mulliganDone: false,
     turnsStarted: 0,
+    customDeck: null,
   };
 }
 
@@ -80,8 +82,13 @@ export function createGame(roomId: string): GameState {
   };
 }
 
+/**
+ * Identifiant unique. Préfixé par la room : plusieurs parties tournent en
+ * parallèle sur le même serveur, et deux parties ne doivent jamais produire le
+ * même identifiant de carte.
+ */
 function genId(state: GameState, prefix: string): string {
-  return `${prefix}${state.seq++}`;
+  return `${prefix}_${state.roomId}_${state.seq++}`;
 }
 
 function log(state: GameState, text: string, player?: PlayerId): void {
@@ -95,17 +102,35 @@ function log(state: GameState, text: string, player?: PlayerId): void {
 
 export function setFaction(state: GameState, playerId: PlayerId, faction: Faction): ActionResult {
   if (state.status !== 'LOBBY') return { ok: false, error: 'La partie a déjà commencé.' };
-  state.players[playerId].faction = faction;
-  state.players[playerId].ready = false;
+  const p = state.players[playerId];
+  p.faction = faction;
+  p.customDeck = null; // choisir une faction annule le deck personnalisé
+  p.ready = false;
   return { ok: true };
+}
+
+/** Deck personnalisé (mix de factions), validé côté serveur. */
+export function setCustomDeck(state: GameState, playerId: PlayerId, ids: string[]): ActionResult {
+  if (state.status !== 'LOBBY') return { ok: false, error: 'La partie a déjà commencé.' };
+  const v = validateDeck(ids);
+  if (!v.ok) return { ok: false, error: v.error };
+  const p = state.players[playerId];
+  p.customDeck = [...ids];
+  p.faction = null;
+  p.ready = false;
+  return { ok: true };
+}
+
+function hasDeckChoice(p: PlayerState): boolean {
+  return !!p.faction || !!p.customDeck;
 }
 
 export function setReady(state: GameState, playerId: PlayerId, ready: boolean): ActionResult {
   if (state.status !== 'LOBBY') return { ok: false, error: 'La partie a déjà commencé.' };
   const p = state.players[playerId];
-  if (ready && !p.faction) return { ok: false, error: "Choisis d'abord une faction." };
+  if (ready && !hasDeckChoice(p)) return { ok: false, error: "Choisis d'abord une faction ou construis ton deck." };
   p.ready = ready;
-  const both = state.players.A.ready && state.players.B.ready && state.players.A.faction && state.players.B.faction;
+  const both = state.players.A.ready && state.players.B.ready && hasDeckChoice(state.players.A) && hasDeckChoice(state.players.B);
   if (both) startGame(state);
   return { ok: true };
 }
@@ -134,37 +159,110 @@ function makeBoardCard(state: GameState, cardId: string, owner: PlayerId, summon
 export function startGame(state: GameState, rng: () => number = Math.random): void {
   for (const pid of ['A', 'B'] as PlayerId[]) {
     const p = state.players[pid];
-    const faction = p.faction!;
-    // Hero into the hero slot (not part of the draw deck).
-    const hero = getCard(`${faction}_hero`);
-    p.hero = makeBoardCard(state, hero.id, pid, false);
-    // Build & shuffle the deck.
-    const deckIds = shuffle(buildDeck(faction), rng);
+    // Le héros n'est plus automatique : le joueur le choisira dans sa main.
+    p.hero = null;
+    // Build & shuffle the deck (personnalisé si fourni, sinon deck de faction).
+    const baseIds = p.customDeck ?? buildDeck(p.faction!);
+    const deckIds = shuffle(baseIds, rng);
     p.deck = deckIds.map((cid) => ({ instanceId: genId(state, 'ci'), cardId: cid }));
     p.hand = [];
     p.graveyard = [];
     p.board = [];
     p.sinsPlayed = [];
     p.setupDone = false;
+    p.mulliganDone = false;
     p.turnsStarted = 0;
-    // Opening hand.
-    for (let i = 0; i < OPENING_HAND; i++) {
-      const card = p.deck.shift();
-      if (card) p.hand.push(card);
-    }
+    // Opening hand — garantit au moins une invocation basique pour le héros.
+    drawOpeningHand(state, p, rng);
   }
   state.status = 'SETUP';
   state.activePlayer = rng() < 0.5 ? 'A' : 'B'; // pile ou face pour le premier joueur
   state.phase = 'MAIN';
   state.turnNumber = 1;
   state.winner = null;
-  log(state, `Mise en place : posez votre HÉRO et jusqu'à ${MAX_SETUP_INVOCATIONS} invocations face cachée.`);
+  log(state, 'Mise en place : échangez vos cartes, choisissez votre HÉRO, puis posez vos invocations face cachée.');
+}
+
+/**
+ * Pioche la main d'ouverture. Si aucune invocation basique n'est tirée, on
+ * échange une carte contre la première invocation basique du deck : sans ça le
+ * joueur ne pourrait pas désigner de héros.
+ */
+function drawOpeningHand(state: GameState, p: PlayerState, rng: () => number): void {
+  for (let i = 0; i < OPENING_HAND; i++) {
+    const card = p.deck.shift();
+    if (card) p.hand.push(card);
+  }
+  if (p.hand.some((c) => isBasicInvocationId(c.cardId))) return;
+  const idx = p.deck.findIndex((c) => isBasicInvocationId(c.cardId));
+  if (idx < 0) return; // deck sans invocation basique : impossible via validateDeck
+  const basic = p.deck.splice(idx, 1)[0];
+  const swapped = p.hand.pop();
+  p.hand.push(basic);
+  if (swapped) {
+    p.deck.push(swapped);
+    p.deck = shuffle(p.deck, rng);
+  }
+}
+
+/** Mulligan à la Hearthstone : renvoie les cartes choisies et repioche autant. */
+export function mulligan(state: GameState, playerId: PlayerId, instanceIds: string[], rng: () => number = Math.random): ActionResult {
+  if (state.status !== 'SETUP') return { ok: false, error: 'La mise en place est terminée.' };
+  const p = state.players[playerId];
+  if (p.mulliganDone) return { ok: false, error: 'Tu as déjà échangé tes cartes.' };
+  if (p.hero) return { ok: false, error: 'Trop tard : ton héros est déjà choisi.' };
+
+  const toSwap = p.hand.filter((c) => instanceIds.includes(c.instanceId));
+  if (toSwap.length > 0) {
+    p.hand = p.hand.filter((c) => !instanceIds.includes(c.instanceId));
+    // On repioche AVANT de remettre les cartes rendues, pour ne pas les retirer.
+    for (let i = 0; i < toSwap.length; i++) {
+      const card = p.deck.shift();
+      if (card) p.hand.push(card);
+    }
+    p.deck.push(...toSwap);
+    p.deck = shuffle(p.deck, rng);
+    // Garantit encore une invocation basique pour pouvoir choisir un héros.
+    if (!p.hand.some((c) => isBasicInvocationId(c.cardId))) {
+      const idx = p.deck.findIndex((c) => isBasicInvocationId(c.cardId));
+      if (idx >= 0) {
+        const basic = p.deck.splice(idx, 1)[0];
+        const swapped = p.hand.pop();
+        p.hand.push(basic);
+        if (swapped) p.deck.push(swapped);
+        p.deck = shuffle(p.deck, rng);
+      }
+    }
+    log(state, `${p.name} échange ${toSwap.length} carte(s).`, playerId);
+  }
+  p.mulliganDone = true;
+  return { ok: true };
+}
+
+/** Le joueur désigne une invocation de sa main comme HÉROS. */
+export function chooseHero(state: GameState, playerId: PlayerId, instanceId: string): ActionResult {
+  if (state.status !== 'SETUP') return { ok: false, error: 'La mise en place est terminée.' };
+  const p = state.players[playerId];
+  if (p.hero) return { ok: false, error: 'Ton héros est déjà choisi.' };
+  const idx = p.hand.findIndex((c) => c.instanceId === instanceId);
+  if (idx < 0) return { ok: false, error: 'Carte introuvable dans ta main.' };
+  const inst = p.hand[idx];
+  if (!isBasicInvocationId(inst.cardId)) {
+    return { ok: false, error: 'Seule une invocation sans condition peut devenir ton héros.' };
+  }
+  p.hand.splice(idx, 1);
+  const hero = makeBoardCard(state, inst.cardId, playerId, false);
+  hero.instanceId = inst.instanceId;
+  hero.isHero = true;
+  p.hero = hero;
+  p.mulliganDone = true; // choisir son héros verrouille le mulligan
+  log(state, `${p.name} choisit son héros.`, playerId);
+  return { ok: true };
 }
 
 /** Can this hand card be placed face-down during setup? (basic invocation, no sacrifice) */
 function isSetupPlaceable(cardId: string): boolean {
-  const def = getCard(cardId);
-  return def.type === 'INVOCATION' && !def.summoningConditions?.length;
+  return isBasicInvocationId(cardId);
 }
 
 export function setupPlace(state: GameState, playerId: PlayerId, instanceId: string): ActionResult {
@@ -199,8 +297,10 @@ export function setupUnplace(state: GameState, playerId: PlayerId, instanceId: s
 
 export function setupDone(state: GameState, playerId: PlayerId): ActionResult {
   if (state.status !== 'SETUP') return { ok: false, error: 'La mise en place est terminée.' };
-  state.players[playerId].setupDone = true;
-  log(state, `${state.players[playerId].name} est prêt.`, playerId);
+  const p = state.players[playerId];
+  if (!p.hero) return { ok: false, error: "Choisis d'abord ton héros parmi tes invocations." };
+  p.setupDone = true;
+  log(state, `${p.name} est prêt.`, playerId);
   if (state.players.A.setupDone && state.players.B.setupDone) revealAndStart(state);
   return { ok: true };
 }
@@ -607,7 +707,7 @@ export function destroyCharacter(state: GameState, card: BoardCard, triggerDeath
   const owner = state.players[card.ownerId];
   const def = cardDef(card);
 
-  if (def.type === 'HERO') {
+  if (card.isHero || owner.hero?.instanceId === card.instanceId) {
     // Hero destroyed → the owner loses.
     state.winner = OTHER[card.ownerId];
     state.status = 'FINISHED';
@@ -632,8 +732,22 @@ export function destroyCharacter(state: GameState, card: BoardCard, triggerDeath
     for (const e of def.effects ?? []) {
       if (e.trigger !== 'ON_DEATH') continue;
       if (e.action === 'SUMMON_FROM_DECK' && e.summonCardId) summonFromDeck(state, card.ownerId, e.summonCardId, e.text ?? def.name);
+      if (e.action === 'SUMMON_TOKEN' && e.summonCardId) summonToken(state, card.ownerId, e.summonCardId, e.text ?? def.name);
     }
   }
+  recomputeAuras(state);
+}
+
+/**
+ * Crée une carte-conséquence directement sur le plateau (elle n'existe ni dans
+ * le deck ni dans la main — ex: Dévoreur de Papillons via Karma Floral).
+ */
+function summonToken(state: GameState, playerId: PlayerId, cardId: string, label: string): void {
+  const p = state.players[playerId];
+  if (p.board.length >= MAX_BOARD) return;
+  const bc = makeBoardCard(state, cardId, playerId, true);
+  p.board.push(bc);
+  log(state, `${label} : ${getCard(cardId).name} apparaît sur le terrain !`, playerId);
   recomputeAuras(state);
 }
 
@@ -1026,9 +1140,15 @@ function attack(state: GameState, playerId: PlayerId, attackerId: string, target
   const target = [foe.hero, ...foe.board].filter(Boolean).find((c) => c!.instanceId === targetId) as BoardCard | undefined;
   if (!target) return { ok: false, error: 'Cible adverse introuvable.' };
 
-  // Taunt: if the defender has any taunt invocation, only taunts may be targeted.
+  // Provocation globale : toutes les invocations protègent le héros. On ne peut
+  // viser le héros que si le plateau adverse est vide. Une carte avec le mot-clé
+  // Provocation reste prioritaire sur les autres invocations.
+  const isHeroTarget = target.instanceId === foe.hero?.instanceId;
+  if (isHeroTarget && foe.board.length > 0) {
+    return { ok: false, error: "Tu dois d'abord détruire les invocations adverses avant d'attaquer le héros." };
+  }
   const taunts = foe.board.filter((c) => hasTaunt(c));
-  if (taunts.length > 0 && !hasTaunt(target)) {
+  if (!isHeroTarget && taunts.length > 0 && !hasTaunt(target)) {
     return { ok: false, error: 'Une provocation adverse doit être attaquée en premier.' };
   }
 
@@ -1047,6 +1167,10 @@ function attack(state: GameState, playerId: PlayerId, attackerId: string, target
 
 export function applyAction(state: GameState, playerId: PlayerId, action: GameAction): ActionResult {
   switch (action.type) {
+    case 'MULLIGAN':
+      return mulligan(state, playerId, action.instanceIds);
+    case 'CHOOSE_HERO':
+      return chooseHero(state, playerId, action.instanceId);
     case 'SETUP_PLACE':
       return setupPlace(state, playerId, action.instanceId);
     case 'SETUP_UNPLACE':
@@ -1099,6 +1223,8 @@ function redactPlayer(p: PlayerState, isYou: boolean): RedactedPlayerState {
     graveyard: p.graveyard,
     sinsPlayed: p.sinsPlayed,
     setupDone: p.setupDone,
+    mulliganDone: p.mulliganDone,
+    customDeckSize: p.customDeck ? p.customDeck.length : null,
   };
 }
 

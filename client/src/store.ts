@@ -32,9 +32,12 @@ interface StoreState {
   disconnect: () => void;
 
   setFaction: (faction: Faction) => void;
+  setCustomDeck: (ids: string[]) => void;
   setName: (name: string) => void;
   toggleReady: () => void;
 
+  mulligan: (instanceIds: string[]) => void;
+  chooseHero: (instanceId: string) => void;
   setupPlace: (instanceId: string) => void;
   setupUnplace: (instanceId: string) => void;
   setupReady: () => void;
@@ -99,6 +102,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   setFaction: (faction) => get().socket?.emit('setFaction', { faction }),
+  setCustomDeck: (ids) => get().socket?.emit('setCustomDeck', { ids }),
   setName: (name) => {
     localStorage.setItem('boloss:name', name);
     get().socket?.emit('setName', { name });
@@ -110,6 +114,8 @@ export const useStore = create<StoreState>((set, get) => ({
     get().socket?.emit('ready', { ready: !g.players[you].ready });
   },
 
+  mulligan: (instanceIds) => get().socket?.emit('action', { type: 'MULLIGAN', instanceIds } as GameAction),
+  chooseHero: (instanceId) => get().socket?.emit('action', { type: 'CHOOSE_HERO', instanceId } as GameAction),
   setupPlace: (instanceId) => get().socket?.emit('action', { type: 'SETUP_PLACE', instanceId } as GameAction),
   setupUnplace: (instanceId) => get().socket?.emit('action', { type: 'SETUP_UNPLACE', instanceId } as GameAction),
   setupReady: () => get().socket?.emit('action', { type: 'SETUP_DONE' } as GameAction),

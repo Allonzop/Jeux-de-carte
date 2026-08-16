@@ -160,18 +160,24 @@ function Board({ game }: { game: RedactedGameState }) {
           <div className="flex items-center justify-center gap-3 py-1">
             <div className="h-px flex-1 bg-white/10" />
             {myTurn ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {game.phase === 'MAIN' && (
-                  <button onClick={nextPhase} className="rounded-md bg-boloss-red px-4 py-1.5 text-sm font-semibold text-white hover:brightness-110">
-                    ⚔ Phase de Combat
+                  <button
+                    onClick={nextPhase}
+                    className="rounded-md bg-boloss-red px-3 py-2 text-xs font-semibold text-white transition active:scale-95 sm:px-4 sm:py-1.5 sm:text-sm"
+                  >
+                    ⚔ Combat
                   </button>
                 )}
-                <button onClick={endTurn} className="rounded-md bg-boloss-gold px-4 py-1.5 text-sm font-semibold text-black hover:brightness-110">
+                <button
+                  onClick={endTurn}
+                  className="rounded-md bg-boloss-gold px-3 py-2 text-xs font-semibold text-black transition active:scale-95 sm:px-4 sm:py-1.5 sm:text-sm"
+                >
                   Fin du tour ⏭
                 </button>
               </div>
             ) : (
-              <span className="rounded-md bg-black/40 px-4 py-1.5 text-sm text-white/60">Tour de l'adversaire…</span>
+              <span className="rounded-md bg-black/40 px-3 py-1.5 text-xs text-white/60 sm:px-4 sm:text-sm">Tour adverse…</span>
             )}
             <div className="h-px flex-1 bg-white/10" />
           </div>
@@ -215,19 +221,23 @@ function TopBar({ game }: { game: RedactedGameState }) {
   const activeName = game.players[game.activePlayer].name;
   const myTurn = isYourTurn(game);
   return (
-    <div className="flex items-center justify-between px-4 py-2">
-      <div className="font-display text-2xl text-boloss-gold">BOLOSS</div>
-      <div className="flex items-center gap-4 text-sm">
+    <div className="flex items-center justify-between gap-2 px-2 py-1.5 sm:px-4 sm:py-2">
+      <div className="font-display text-lg text-boloss-gold sm:text-2xl">BOLOSS</div>
+      <div className="hidden items-center gap-4 text-sm md:flex">
         <span className="text-white/70">
-          {me.name} <span className="text-white/40">({me.faction ? FACTION_LABELS[me.faction] : '—'})</span>
+          {me.name} <span className="text-white/40">({me.faction ? FACTION_LABELS[me.faction] : 'deck perso'})</span>
         </span>
         <span className="text-white/30">vs</span>
         <span className="text-white/70">
-          {foe.name} <span className="text-white/40">({foe.faction ? FACTION_LABELS[foe.faction] : '—'})</span>
+          {foe.name} <span className="text-white/40">({foe.faction ? FACTION_LABELS[foe.faction] : 'deck perso'})</span>
         </span>
       </div>
-      <div className={`rounded-full px-3 py-1 text-sm font-semibold ${myTurn ? 'bg-emerald-500 text-black' : 'bg-black/40 text-white/70'}`}>
-        Tour {game.turnNumber} · {myTurn ? 'À toi' : `À ${activeName}`} · {game.phase === 'MAIN' ? 'Principale' : 'Combat'}
+      <div
+        className={`rounded-full px-2 py-1 text-[11px] font-semibold sm:px-3 sm:text-sm ${
+          myTurn ? 'bg-emerald-500 text-black' : 'bg-black/40 text-white/70'
+        }`}
+      >
+        T{game.turnNumber} · {myTurn ? 'À toi' : `À ${activeName}`} · {game.phase === 'MAIN' ? 'Principale' : 'Combat'}
       </div>
     </div>
   );
@@ -250,15 +260,29 @@ function PlayerField({
   const hero = player.hero;
 
   return (
-    <div className={`flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 p-2 ${isFoe ? 'flex-col-reverse sm:flex-row' : 'flex-col sm:flex-row'}`}>
-      {/* Piles */}
-      <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-black/20 p-1.5 sm:gap-3 sm:p-2">
+      {/* Piles + main adverse : compactées à gauche sur mobile */}
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <Pile label="Deck" count={player.deckCount} faceDown />
         <Pile label="Cimetière" count={player.graveyard.length} topCardId={player.graveyard.at(-1)?.cardId} />
+        {isFoe && (
+          <div className="hidden items-center xl:flex">
+            {Array.from({ length: player.handCount }).map((_, i) => (
+              <div key={i} className="-ml-6 first:ml-0">
+                <CardView faceDown size="sm" />
+              </div>
+            ))}
+          </div>
+        )}
+        {isFoe && (
+          <div className="flex items-center gap-1 rounded-md bg-black/40 px-1.5 py-1 text-[10px] text-white/60 xl:hidden">
+            🖐 {player.handCount}
+          </div>
+        )}
       </div>
 
       {/* Hero */}
-      <div className="flex flex-col items-center">
+      <div className="flex shrink-0 flex-col items-center">
         {hero ? (
           <CardView
             cardId={hero.cardId}
@@ -272,11 +296,11 @@ function PlayerField({
         ) : (
           <EmptySlot label="Héro" />
         )}
-        <span className="mt-1 text-[10px] uppercase tracking-wide text-white/40">Héro</span>
+        <span className="mt-0.5 text-[9px] uppercase tracking-wide text-boloss-gold/70 sm:text-[10px]">Héro</span>
       </div>
 
-      {/* Invocation slots */}
-      <div className="flex flex-1 items-center justify-center gap-2">
+      {/* Invocation slots — défilables horizontalement si ça déborde */}
+      <div className="thin-scroll flex flex-1 items-center justify-center gap-1 overflow-x-auto sm:gap-2">
         {slots.map((c, i) =>
           c ? (
             <CardView
@@ -294,24 +318,13 @@ function PlayerField({
           ),
         )}
       </div>
-
-      {/* Opponent hand (face-down) */}
-      {isFoe && (
-        <div className="flex items-center">
-          {Array.from({ length: player.handCount }).map((_, i) => (
-            <div key={i} className="-ml-6 first:ml-0">
-              <CardView faceDown size="sm" />
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
 function EmptySlot({ label }: { label?: string }) {
   return (
-    <div className="flex w-24 sm:w-[6.5rem] aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed border-white/10 text-[10px] text-white/25">
+    <div className="flex aspect-[3/4] w-[3.75rem] items-center justify-center rounded-lg border-2 border-dashed border-white/10 text-[9px] text-white/25 sm:w-24 sm:text-[10px] md:w-[6.5rem]">
       {label ?? ''}
     </div>
   );
@@ -320,7 +333,7 @@ function EmptySlot({ label }: { label?: string }) {
 function Pile({ label, count, faceDown, topCardId }: { label: string; count: number; faceDown?: boolean; topCardId?: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="relative h-[4.7rem] w-14">
+      <div className="relative h-12 w-9 sm:h-[4.7rem] sm:w-14">
         {count > 0 ? (
           faceDown ? (
             <img src={cardBackImg()} alt={label} className="card-frame absolute inset-0 h-full w-full object-cover opacity-90" />
@@ -338,7 +351,7 @@ function Pile({ label, count, faceDown, topCardId }: { label: string; count: num
           <span className="absolute -bottom-1 -right-1 rounded-full bg-black/80 px-1.5 text-[10px] text-white">{count}</span>
         )}
       </div>
-      <span className="mt-1 text-[10px] uppercase tracking-wide text-white/40">{label}</span>
+      <span className="mt-0.5 hidden text-[10px] uppercase tracking-wide text-white/40 sm:block">{label}</span>
     </div>
   );
 }
@@ -355,14 +368,18 @@ function Hand({
   onPlay: (id: string) => void;
 }) {
   return (
-    <div className="flex min-h-[9.5rem] items-end justify-center gap-1 px-4 pb-3 pt-1">
-      {hand.length === 0 && <div className="pb-6 text-sm text-white/40">Main vide</div>}
+    <div className="thin-scroll flex min-h-[7rem] items-end gap-1 overflow-x-auto px-2 pb-2 pt-1 sm:min-h-[9.5rem] sm:justify-center sm:px-4 sm:pb-3">
+      {hand.length === 0 && <div className="w-full pb-6 text-center text-sm text-white/40">Main vide</div>}
       {hand.map((inst, i) => {
         if (!inst) return null;
         const isPlayable = playable.has(inst.instanceId);
         const isSelected = interaction.mode === 'play-target' && interaction.handInstanceId === inst.instanceId;
         return (
-          <div key={inst.instanceId} className="transition-transform" style={{ marginLeft: i === 0 ? 0 : '-1.25rem' }}>
+          <div
+            key={inst.instanceId}
+            className="shrink-0 transition-transform"
+            style={{ marginLeft: i === 0 ? 0 : undefined }}
+          >
             <CardView
               cardId={inst.cardId}
               size="lg"

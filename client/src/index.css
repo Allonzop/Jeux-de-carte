@@ -18,6 +18,20 @@ body {
   color: #e9e2cf;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Mobile : pas de rebond élastique ni de sélection accidentelle pendant le jeu. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* Respecte l'encoche / la barre gestuelle des téléphones. */
+#root {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .font-display {

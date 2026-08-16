@@ -17,10 +17,11 @@ interface Props {
   title?: string;
 }
 
+// Tailles pensées mobile-first : compactes sur petit écran, confortables ensuite.
 const SIZES: Record<NonNullable<Props['size']>, string> = {
-  sm: 'w-14',
-  md: 'w-24 sm:w-[6.5rem]',
-  lg: 'w-28 sm:w-32',
+  sm: 'w-9 sm:w-14',
+  md: 'w-[3.75rem] sm:w-24 md:w-[6.5rem]',
+  lg: 'w-20 sm:w-28 md:w-32',
 };
 
 const HIGHLIGHT: Record<Highlight, string> = {

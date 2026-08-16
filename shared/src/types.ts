@@ -52,6 +52,7 @@ export type EffectAction =
   | 'COPY_ATTACK' // passive: attack becomes at least the strongest enemy attack
   | 'CANNOT_ATTACK' // apply a "cannot attack" status for `duration` turns
   | 'SUMMON_FROM_DECK' // pull `summonCardId` from the owner's deck onto the board
+  | 'SUMMON_TOKEN' // create `summonCardId` directly on the board (carte-conséquence)
   | 'DRAW' // draw `value` cards
   | 'FLAVOR'; // no mechanical effect (collector / meme cards)
 
@@ -118,6 +119,12 @@ export interface CardDef {
   effects?: CardEffect[];
   /** Free-form tags used by summoning conditions & filters (e.g. ["sin"], ["cuivre"]). */
   tags?: string[];
+  /**
+   * Carte-conséquence : n'existe jamais dans un deck ou une main, elle
+   * n'apparaît que comme résultat d'un effet (ex: Dévoreur de Papillons,
+   * invoqué par la mort de la Fleure Royale avec un Flingue).
+   */
+  token?: boolean;
 }
 
 /* ------------------------------------------------------------------ *
@@ -168,6 +175,8 @@ export interface BoardCard {
   hasAttackedThisTurn: boolean;
   /** Extra attacks granted this turn (e.g. Coup de Pression). */
   extraAttacks: number;
+  /** Cette carte occupe le slot HÉROS (choisi au setup) : sa mort fait perdre. */
+  isHero?: boolean;
   /** Face-down during the setup phase — cardId is stripped in the opponent's view. */
   hidden?: boolean;
 }
@@ -201,7 +210,10 @@ export interface PlayerState {
   graveyard: CardInstance[];
   sinsPlayed: string[]; // ids of "péchés capitaux" already used this game
   setupDone: boolean; // has confirmed their face-down placement
+  mulliganDone: boolean; // has done their one-time hand swap (Hearthstone-style)
   turnsStarted: number; // how many of this player's turns have begun (for setup sickness)
+  /** Custom deck (card ids) chosen in the lobby; null = prebuilt faction deck. */
+  customDeck: string[] | null;
 }
 
 export interface GameState {
@@ -222,6 +234,8 @@ export interface GameState {
  * ------------------------------------------------------------------ */
 
 export type GameAction =
+  | { type: 'MULLIGAN'; instanceIds: string[] } // [] = tout garder
+  | { type: 'CHOOSE_HERO'; instanceId: string }
   | { type: 'SETUP_PLACE'; instanceId: string }
   | { type: 'SETUP_UNPLACE'; instanceId: string }
   | { type: 'SETUP_DONE' }
@@ -249,6 +263,9 @@ export interface RedactedPlayerState {
   graveyard: CardInstance[];
   sinsPlayed: string[];
   setupDone: boolean;
+  mulliganDone: boolean;
+  /** Taille du deck personnalisé sélectionné (null = deck de faction). */
+  customDeckSize: number | null;
 }
 
 export interface RedactedGameState {

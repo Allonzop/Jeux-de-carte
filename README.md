@@ -157,14 +157,25 @@ variable d'environnement si besoin.
 
 - **But** : réduire les HP du HÉRO adverse à 0.
 - **Pas de mana** : les actions sont illimitées tant que les conditions sont remplies.
-- **Setup** : pioche de **10 cartes**, puis pose du HÉRO et de 0 à 4 invocations
-  **face cachée**, puis révélation du plateau (pile ou face pour le 1er joueur).
+- **Deck** : soit un **deck de faction** prêt à jouer, soit un **deck personnalisé**
+  mélangeant les cartes de toutes les factions (20 à 30 cartes, 2 exemplaires
+  max par carte — 1 seul pour les rangs S et F).
+- **Setup en 3 étapes** : pioche de **10 cartes** → **mulligan** (renvoyer tout ou
+  partie de sa main et repiocher autant, à la Hearthstone) → **choix du HÉROS**
+  (une invocation de ta main devient ton héros, avec **ses** stats) → pose de 0 à
+  4 invocations **face cachée**, puis révélation du plateau.
 - **Main** : 10 cartes max, l'excédent de pioche est défaussé.
 - **Plateau** : 1 HÉRO + 4 invocations max.
 - **Tour** : Début (pioche 2, effets de début) → Phase Principale → Phase de Combat → Fin (nettoyage des buffs temporaires).
 - **Mal d'invocation** : une invocation ne peut pas attaquer le tour où elle est posée (sauf *Charge*). Les invocations posées en mise en place dorment aussi pendant tout le 1er tour de leur propriétaire.
-- **Ciblage libre** : on peut attaquer une invocation OU le HÉRO — sauf en présence d'une *Provocation*.
+- **Provocation globale** : le HÉRO est **intouchable tant qu'il reste une seule
+  invocation adverse** sur le plateau. Il faut nettoyer le terrain d'abord. Une
+  carte avec le mot-clé *Provocation* reste prioritaire sur les autres invocations.
 - **Destruction** : à 0 HP, la carte part au cimetière (déclenche les effets à la mort).
+- **Cartes-conséquences** : certaines cartes n'existent pas dans les decks et
+  n'apparaissent que via un effet — le **Dévoreur de Papillons** (20 PV / 80 ATK)
+  ne surgit qu'à la mort de la *Fleure Royale avec un Flingue*. Elles sont
+  marquées `token` dans `shared/src/cards.ts` et sont refusées par le deck builder.
 
 ### Toutes les cartes sont fonctionnelles
 
@@ -179,8 +190,21 @@ contrôle). Voir `shared/src/engine.ts`. Seule la carte-blague rang F
 
 ---
 
+## 📱 Mobile & parties simultanées
+
+- **Mobile** : interface repensée en mobile-first (cartes compactes, plateau sur
+  une ligne, main défilable, boutons tactiles, pas de zoom parasite, respect de
+  l'encoche). Le deck builder et la mise en place sont utilisables au doigt.
+- **Parties simultanées** : le serveur gère déjà **plusieurs parties en
+  parallèle** — chaque room a son propre `GameState` isolé. Validé par un test
+  automatisé : 3 parties / 6 joueurs en même temps, états étanches, un 3ᵉ joueur
+  sur une partie pleine est refusé. Les identifiants de cartes sont préfixés par
+  la room pour rester uniques d'une partie à l'autre.
+
+---
+
 ## 🗺️ Suite (jalons futurs)
 
-- Deck-building personnalisé (au lieu des decks de faction auto-générés).
 - Effets de combat plus riches (animations d'attaque, sons).
 - Persistance des parties / spectateurs / reconnexion longue durée.
+- Sauvegarde des decks personnalisés entre les sessions.

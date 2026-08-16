@@ -8,6 +8,7 @@ import { Server, type Socket } from 'socket.io';
 import {
   applyAction,
   serializeFor,
+  setCustomDeck,
   setFaction,
   setReady,
   type Faction,
@@ -85,6 +86,16 @@ io.on('connection', (socket: Socket) => {
     const room = getRoom(m.roomId);
     if (!room) return;
     const res = setFaction(room.state, m.playerId, payload.faction);
+    if (!res.ok) socket.emit('actionError', { error: res.error });
+    broadcast(room);
+  });
+
+  socket.on('setCustomDeck', (payload: { ids: string[] }) => {
+    const m = meta.get(socket);
+    if (!m) return;
+    const room = getRoom(m.roomId);
+    if (!room) return;
+    const res = setCustomDeck(room.state, m.playerId, payload?.ids ?? []);
     if (!res.ok) socket.emit('actionError', { error: res.error });
     broadcast(room);
   });

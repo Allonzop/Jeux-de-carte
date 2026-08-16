@@ -10,6 +10,7 @@ import {
 } from '@boloss/shared';
 import { cardImg } from '../lib/game';
 import { useStore } from '../store';
+import DeckBuilder from './DeckBuilder';
 
 export default function Lobby({ game }: { game: RedactedGameState }) {
   const you = game.you;
@@ -17,11 +18,14 @@ export default function Lobby({ game }: { game: RedactedGameState }) {
   const other: PlayerId = you === 'A' ? 'B' : 'A';
   const foe = game.players[other];
   const setFaction = useStore((s) => s.setFaction);
+  const setCustomDeck = useStore((s) => s.setCustomDeck);
   const toggleReady = useStore((s) => s.toggleReady);
   const setName = useStore((s) => s.setName);
 
   const [copied, setCopied] = useState(false);
   const [name, setNameLocal] = useState(me.name);
+  const [building, setBuilding] = useState(false);
+  const [myDeck, setMyDeck] = useState<string[]>([]);
 
   const shareUrl = window.location.href;
   const copy = async () => {
@@ -33,6 +37,20 @@ export default function Lobby({ game }: { game: RedactedGameState }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+
+  if (building) {
+    return (
+      <DeckBuilder
+        initial={myDeck}
+        onCancel={() => setBuilding(false)}
+        onSave={(ids) => {
+          setMyDeck(ids);
+          setCustomDeck(ids);
+          setBuilding(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
@@ -65,6 +83,7 @@ export default function Lobby({ game }: { game: RedactedGameState }) {
           editable
           name={name}
           faction={me.faction}
+          customDeckSize={me.customDeckSize}
           ready={me.ready}
           connected
           onName={(v) => {
@@ -76,22 +95,44 @@ export default function Lobby({ game }: { game: RedactedGameState }) {
           title="Adversaire"
           name={foe.name}
           faction={foe.faction}
+          customDeckSize={foe.customDeckSize}
           ready={foe.ready}
           connected={foe.connected}
         />
       </div>
 
+      {/* Deck personnalisé */}
+      <button
+        onClick={() => setBuilding(true)}
+        className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition ${
+          me.customDeckSize ? 'border-boloss-gold bg-boloss-gold/10 shadow-glow' : 'border-white/15 bg-black/30 hover:border-white/30'
+        }`}
+      >
+        <div>
+          <div className="font-display text-lg text-boloss-gold">🛠 Construire mon deck</div>
+          <div className="text-xs text-white/65">
+            {me.customDeckSize
+              ? `Deck personnalisé de ${me.customDeckSize} cartes sélectionné — clique pour modifier.`
+              : 'Mélange les cartes de toutes les factions (2 exemplaires max par carte).'}
+          </div>
+        </div>
+        <span className="text-2xl">›</span>
+      </button>
+
       {/* Faction picker */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {FACTIONS.map((f) => (
-          <FactionTile key={f} faction={f} selected={me.faction === f} onSelect={() => setFaction(f)} />
-        ))}
+      <div>
+        <div className="mb-2 text-center text-xs uppercase tracking-wide text-white/40">…ou choisis un deck prêt à jouer</div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {FACTIONS.map((f) => (
+            <FactionTile key={f} faction={f} selected={me.faction === f} onSelect={() => setFaction(f)} />
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-col items-center gap-2">
         <button
           onClick={toggleReady}
-          disabled={!me.faction}
+          disabled={!me.faction && !me.customDeckSize}
           className={`rounded-lg px-8 py-3 font-display text-2xl tracking-wide transition disabled:opacity-40 ${
             me.ready ? 'bg-emerald-500 text-black' : 'bg-boloss-red text-white hover:brightness-110'
           }`}
@@ -108,6 +149,7 @@ function PlayerCard({
   title,
   name,
   faction,
+  customDeckSize,
   ready,
   connected,
   editable,
@@ -116,6 +158,7 @@ function PlayerCard({
   title: string;
   name: string;
   faction: Faction | null;
+  customDeckSize: number | null;
   ready: boolean;
   connected: boolean;
   editable?: boolean;
@@ -141,7 +184,9 @@ function PlayerCard({
         <div className="mb-2 truncate text-sm text-white/80">{name}</div>
       )}
       <div className="flex items-center justify-between text-sm">
-        <span className="text-white/60">{faction ? FACTION_LABELS[faction] : 'Aucune faction'}</span>
+        <span className="text-white/60">
+          {faction ? FACTION_LABELS[faction] : customDeckSize ? `Deck perso (${customDeckSize})` : 'Aucun deck'}
+        </span>
         <span className={ready ? 'text-emerald-400' : 'text-white/40'}>{ready ? 'Prêt' : '…'}</span>
       </div>
     </div>

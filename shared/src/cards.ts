@@ -29,7 +29,7 @@ const CARDS: CardDef[] = [
     id: 'avocat_hero',
     name: 'Avocat du Diable',
     faction: 'avocat',
-    type: 'HERO',
+    type: 'INVOCATION',
     rank: 'A',
     image: 'avocat_hero.jpg',
     baseHp: 80,
@@ -199,7 +199,7 @@ const CARDS: CardDef[] = [
     id: 'floral_hero',
     name: 'Tyrannie Florale',
     faction: 'floral',
-    type: 'HERO',
+    type: 'INVOCATION',
     rank: 'A',
     image: 'floral_hero.jpg',
     baseHp: 80,
@@ -344,10 +344,12 @@ const CARDS: CardDef[] = [
     baseHp: 20,
     baseAttack: 10,
     attackName: 'Coup de Sceptre',
-    attackDesc: 'Karma Floral — à sa mort, invoque le Dévoreur de Papillons depuis ton deck.',
-    effects: [{ trigger: 'ON_DEATH', action: 'SUMMON_FROM_DECK', summonCardId: 'floral_devoreur_papillons', text: 'Karma Floral' }],
+    attackDesc: 'Karma Floral — à sa mort, le Dévoreur de Papillons apparaît à sa place.',
+    effects: [{ trigger: 'ON_DEATH', action: 'SUMMON_TOKEN', summonCardId: 'floral_devoreur_papillons', text: 'Karma Floral' }],
   },
   {
+    // Carte-conséquence : jamais dans un deck, apparaît uniquement à la mort
+    // de la Fleure Royale avec un Flingue.
     id: 'floral_devoreur_papillons',
     name: 'Dévoreur de Papillons',
     faction: 'floral',
@@ -358,6 +360,7 @@ const CARDS: CardDef[] = [
     baseAttack: 80,
     attackName: 'Coup Brutal',
     attackDesc: 'Libération — peut attaquer dès son invocation.',
+    token: true,
     effects: [{ trigger: 'PASSIVE', action: 'CHARGE', text: 'Libération' }],
   },
   {
@@ -388,7 +391,7 @@ const CARDS: CardDef[] = [
     id: 'jules_hero',
     name: 'Jeune Disciple Fermier',
     faction: 'jules',
-    type: 'HERO',
+    type: 'INVOCATION',
     rank: 'A',
     image: 'jules_hero.jpg',
     baseHp: 80,
@@ -558,7 +561,7 @@ const CARDS: CardDef[] = [
     id: 'monster_hero',
     name: 'Reine des Pyrobarbares',
     faction: 'monster',
-    type: 'HERO',
+    type: 'INVOCATION',
     rank: 'A',
     image: 'monster_hero.jpg',
     baseHp: 80,
@@ -685,7 +688,7 @@ const CARDS: CardDef[] = [
     id: 'soldat_hero',
     name: 'Agent des Forces Rouges',
     faction: 'soldat',
-    type: 'HERO',
+    type: 'INVOCATION',
     rank: 'A',
     image: 'soldat_hero.jpg',
     baseHp: 80,
@@ -871,8 +874,10 @@ export function cardsByFaction(faction: Faction): CardDef[] {
   return CARDS.filter((c) => c.faction === faction);
 }
 
+/**
+ * Carte emblème d'une faction (l'ex-« héros » fixe), utilisée pour l'illustration
+ * du lobby. Le héros réel est désormais choisi par le joueur pendant le setup.
+ */
 export function heroForFaction(faction: Faction): CardDef {
-  const hero = CARDS.find((c) => c.faction === faction && c.type === 'HERO');
-  if (!hero) throw new Error(`No hero for faction ${faction}`);
-  return hero;
+  return getCard(`${faction}_hero`);
 }

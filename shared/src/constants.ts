@@ -5,6 +5,7 @@ export const MAX_BOARD = 4; // invocation slots per player
 export const MAX_HAND = 10; // hand size limit — overdraw is discarded
 export const DRAW_PER_TURN = 2; // draw at each Start of Turn
 export const DECK_SIZE = 30; // deck cap
+export const DECK_MIN = 20; // taille minimale d'un deck personnalisé
 export const MAX_COPIES = 2; // max copies of the same card in a deck
 
 /**

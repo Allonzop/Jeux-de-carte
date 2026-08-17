@@ -368,7 +368,7 @@ export default function IntroSplash() {
         <div
           ref={logoRef}
           data-intro-logo=""
-          className={`flex h-[52vh] w-[78vw] max-w-4xl items-center justify-center will-change-transform ${
+          className={`flex h-[58vh] w-[86vw] max-w-5xl items-center justify-center will-change-transform ${
             phase === 'blocked' ? 'animate-introIdle opacity-60' : 'opacity-0'
           }`}
         >

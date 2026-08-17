@@ -201,19 +201,18 @@ Le mot « BOLOSS » n'est plus écrit en dur nulle part : tous les emplacements
 (accueil, salon, barre de jeu, écran de chargement) passent par le composant
 [`client/src/components/Logo.tsx`](client/src/components/Logo.tsx).
 
-**Pour mettre ton logo :** dépose le fichier image dans ce dossier —
+Le logo en place est `client/src/assets/brand/logo.webp` — l'original
+(`source/LOGO 2 (1).png`, 3508×2480, 3,4 Mo) a été **recadré sur son contenu et
+compressé à ~180 Ko** pour ne pas plomber le chargement, surtout en 4G. Il est
+conservé dans `source/`, en dehors du dossier scanné, pour pouvoir régénérer une
+autre taille.
 
-```
-client/src/assets/brand/       ← n'importe quel .png / .webp / .jpg / .svg
-```
-
-…et c'est tout, **sans le renommer** : `LOGO 2 (1).jpg` est repris tel quel. Le
-composant détecte le fichier **au build** (`import.meta.glob`), il apparaît
-partout, et le **ratio est préservé** : chaque emplacement impose une hauteur,
-la largeur suit (`object-contain`). Tant qu'aucun fichier n'est présent, un logo
-typographique de secours prend le relais — rien ne casse. Voir
-[`client/src/assets/brand/README.md`](client/src/assets/brand/README.md) pour
-les recommandations (fond transparent, format paysage).
+**Pour le remplacer :** dépose simplement une image dans
+`client/src/assets/brand/` — n'importe quel `.png` / `.webp` / `.jpg` / `.svg`,
+**sans avoir à la renommer**. Le composant la détecte **au build**
+(`import.meta.glob`) et elle apparaît partout. Le **ratio est toujours
+préservé** (`object-contain`). Sans aucun fichier, un logo typographique de
+secours prend le relais — rien ne casse.
 
 > Le plus simple si tu n'as pas le repo en local : sur GitHub, ouvre le dossier
 > `client/src/assets/brand/` sur la branche, puis **Add file → Upload files**.

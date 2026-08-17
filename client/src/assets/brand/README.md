@@ -20,6 +20,17 @@ gagne, et à défaut le format le plus propre (`png` avant `jpg`).
 Tant qu'aucun fichier n'est présent, l'interface affiche un **logo typographique
 de secours** — rien ne casse.
 
+### Ce qui est en place
+
+- **`logo.webp`** (1600×1009, ~180 Ko) : le fichier réellement embarqué dans le
+  jeu. Recadré sur le contenu (les marges transparentes du PNG d'origine
+  faisaient perdre de la place) et compressé.
+- **`source/LOGO 2 (1).png`** (3508×2480, 3,4 Mo) : l'original, conservé mais
+  **hors du dossier scanné** — il n'est donc jamais envoyé aux joueurs. C'est
+  lui qu'il faut reprendre pour régénérer une autre taille.
+
+Charger 3,4 Mo à chaque ouverture de page aurait été très lourd, surtout en 4G.
+
 ### Recommandations sur le fichier
 
 - **Fond transparent** (PNG ou WebP) : le logo est posé sur des fonds sombres.

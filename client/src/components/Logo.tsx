@@ -40,12 +40,16 @@ export const LOGO_URL: string | null =
  * sans jamais déborder.
  */
 const SIZES = {
-  /** Barre de jeu, en haut du plateau (ex-`text-lg sm:text-2xl`). */
-  bar: { box: 'h-6 w-auto sm:h-9', text: 'text-lg sm:text-2xl' },
-  /** Titre du salon (ex-`text-5xl`). */
-  title: { box: 'h-14 w-auto sm:h-20', text: 'text-4xl sm:text-5xl' },
-  /** Titre de l'accueil (ex-`text-7xl`). */
-  hero: { box: 'h-20 w-auto sm:h-28', text: 'text-6xl sm:text-7xl' },
+  /** Barre de jeu : place très limitée en hauteur, on cale dessus. */
+  bar: { box: 'h-10 w-auto sm:h-14', text: 'text-lg sm:text-2xl' },
+  /**
+   * Titre du salon et de l'accueil : le logo est un bandeau large ; le caler sur
+   * la hauteur de l'ancien texte le rendait minuscule, on pilote donc par la
+   * largeur et la hauteur suit toute seule. Le `max-h` n'est qu'un garde-fou au
+   * cas où le fichier déposé serait un jour en portrait.
+   */
+  title: { box: 'h-auto w-52 max-h-[40vh] sm:w-60', text: 'text-4xl sm:text-5xl' },
+  hero: { box: 'h-auto w-64 max-h-[50vh] sm:w-80', text: 'text-6xl sm:text-7xl' },
   /**
    * Écran de chargement : on remplit la boîte du parent et `object-contain` se
    * charge du ratio (le logo est centré, jamais déformé ni rogné).

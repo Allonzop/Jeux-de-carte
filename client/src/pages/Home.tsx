@@ -57,6 +57,10 @@ export default function Home() {
           <li>But : réduire les <b>HP du HÉRO adverse à 0</b>. Aucune mana — joue autant que les conditions le permettent.</li>
           <li>Chaque tour : pioche 2 cartes, joue tes cartes (Phase Principale), puis attaque (Phase de Combat).</li>
           <li>Une invocation ne peut pas attaquer le tour où elle est posée (<b>mal d'invocation</b>).</li>
+          <li>
+            Pour voir une carte en grand : <b>clic droit</b> sur ordinateur, <b>appui long</b> au doigt. Touche l'écran
+            ou appuie sur Échap pour refermer.
+          </li>
         </ol>
       </div>
     </div>

@@ -104,6 +104,9 @@ export default function SetupScreen({ game }: { game: RedactedGameState }) {
               Touche les cartes que tu veux <b className="text-boloss-red">jeter</b> — elles seront remplacées par
               d'autres de ton deck.
             </p>
+            <p className="text-center text-[10px] text-white/40">
+              Appui long (ou clic droit) sur une carte pour la voir en grand.
+            </p>
             <div className="flex items-center gap-3 text-[11px]">
               <span className="flex items-center gap-1 text-red-300">
                 <span className="inline-block h-3 w-3 rounded-sm bg-boloss-red" /> ✕ échangée

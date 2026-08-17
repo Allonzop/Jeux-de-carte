@@ -54,3 +54,28 @@ button {
   border: 3px solid #14110c;
   border-radius: 8px;
 }
+
+/*
+ * iOS : un appui long sur une image ouvre le menu système (« Enregistrer
+ * l'image », « Partager »…) et son propre aperçu, ce qui vole le geste et
+ * empêche à la fois notre zoom et le simple tap. On coupe le callout, et on
+ * rend l'image transparente aux évènements pour que la cible tactile soit
+ * toujours le bouton de la carte, jamais l'image.
+ */
+.card-frame,
+.card-frame * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.card-frame img {
+  pointer-events: none;
+}
+
+/* Même précaution sur la carte affichée en grand. */
+.inspect-card {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

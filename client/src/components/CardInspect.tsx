@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { getCard, type CardDef } from '@boloss/shared';
 import { attackOf, cardImg, describeModifiers, maxHp } from '../lib/game';
 import { useStore } from '../store';
@@ -15,6 +16,19 @@ const TYPE_LABELS: Record<CardDef['type'], string> = {
  */
 export default function CardInspect() {
   const inspect = useStore((s) => s.inspect);
+  const hideInspect = useStore((s) => s.hideInspect);
+  const sticky = !!inspect?.sticky;
+
+  // Échap ferme le zoom épinglé (le survol se referme tout seul).
+  useEffect(() => {
+    if (!sticky) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') hideInspect(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sticky, hideInspect]);
+
   if (!inspect) return null;
 
   const def = getCard(inspect.cardId);
@@ -26,17 +40,24 @@ export default function CardInspect() {
   const isCreature = def.type === 'INVOCATION' || def.type === 'HERO';
 
   return (
-    // `pointer-events-none` est essentiel : sans ça, l'overlay plein écran vole
-    // le pointeur à la carte survolée, ce qui déclenche un `pointerleave` et
-    // referme le zoom immédiatement (clignotement). La fermeture est pilotée par
-    // la carte elle-même (souris qui sort / doigt relâché).
-    <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+    // En survol, `pointer-events-none` est essentiel : sinon l'overlay plein
+    // écran vole le pointeur à la carte survolée, ce qui déclenche un
+    // `pointerleave` et referme le zoom aussitôt (clignotement).
+    // Une fois épinglé, au contraire, il doit capter le clic pour se fermer.
+    <div
+      onPointerDown={sticky ? () => hideInspect(true) : undefined}
+      data-inspect={sticky ? 'sticky' : 'hover'}
+      className={`fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm ${
+        sticky ? 'cursor-zoom-out' : 'pointer-events-none'
+      }`}
+    >
       <div className="flex max-h-full w-full max-w-4xl animate-pop flex-col items-center gap-4 overflow-y-auto sm:flex-row sm:items-start">
         {/* Carte en grand */}
         <img
           src={cardImg(def.image)}
           alt={def.name}
-          className="w-56 shrink-0 rounded-xl border-4 border-black shadow-2xl sm:w-80"
+          draggable={false}
+          className="inspect-card w-56 shrink-0 rounded-xl border-4 border-black shadow-2xl sm:w-80"
         />
 
         {/* Fiche détaillée */}
@@ -101,7 +122,7 @@ export default function CardInspect() {
           )}
 
           <div className="mt-4 text-center text-[11px] text-white/35">
-            Relâche ton doigt ou éloigne la souris pour fermer
+            {sticky ? 'Touche l’écran ou appuie sur Échap pour fermer' : 'Éloigne la souris pour fermer'}
           </div>
         </div>
       </div>

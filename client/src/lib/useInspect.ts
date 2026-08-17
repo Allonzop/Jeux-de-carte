@@ -2,8 +2,30 @@ import { useCallback, useEffect, useRef, type MouseEvent, type PointerEvent } fr
 import type { BoardCard } from '@boloss/shared';
 import { useStore } from '../store';
 
-const HOVER_DELAY = 500; // survol souris (desktop)
-const HOLD_DELAY = 400; // appui long (mobile)
+/**
+ * Zoom d'inspection des cartes.
+ *
+ * Le zoom ne doit JAMAIS surgir pendant qu'on joue. Il y a donc deux façons
+ * volontaires de l'ouvrir, et aucune involontaire :
+ *
+ *  - **Clic droit** (ou clic sur une carte qui n'a pas d'action) : le zoom
+ *    s'ouvre tout de suite et **reste affiché** jusqu'à ce qu'on le ferme.
+ *  - **Souris parfaitement immobile** pendant {@link HOVER_DELAY} : le moindre
+ *    déplacement du curseur relance le compteur, donc traverser le plateau
+ *    n'ouvre plus rien.
+ *  - **Appui long** au doigt, plus long qu'un tap ordinaire, et annulé dès que
+ *    le doigt glisse (c'est alors un défilement).
+ */
+
+/** Souris : durée d'immobilité totale exigée. */
+const HOVER_DELAY = 3000;
+/**
+ * Doigt : franchement plus long qu'un tap, sinon on avalerait le tap — un
+ * appui « normal » sur mobile dure facilement 300 à 500 ms.
+ */
+const HOLD_DELAY = 700;
+/** Déplacement au-delà duquel on considère que ça a bougé (px). */
+const MOVE_TOLERANCE = 8;
 
 export interface InspectHandlers {
   onPointerEnter: (e: PointerEvent) => void;
@@ -15,18 +37,11 @@ export interface InspectHandlers {
   onContextMenu: (e: MouseEvent) => void;
 }
 
-/**
- * Zoom d'inspection façon Hearthstone, version « fabrique » : un seul hook pour
- * une liste de cartes (grille du deck builder par exemple).
- *
- *  - Souris : survol maintenu ~0,5 s → la carte s'affiche en grand.
- *  - Tactile : appui long ~0,4 s → même affichage, et le clic qui suit est
- *    annulé (sinon lâcher le doigt jouerait la carte par accident).
- */
 export function useInspectFactory() {
   const showInspect = useStore((s) => s.showInspect);
   const hideInspect = useStore((s) => s.hideInspect);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const origin = useRef<{ x: number; y: number } | null>(null);
   const longPressed = useRef(false);
 
   const clear = useCallback(() => {
@@ -41,43 +56,71 @@ export function useInspectFactory() {
 
   const inspectFor = useCallback(
     (cardId: string | undefined, board?: BoardCard): InspectHandlers => {
-      const start = (touch: boolean) => {
+      const arm = (e: PointerEvent, touch: boolean) => {
         if (!cardId) return;
         clear();
+        // iOS n'émet pas toujours le `click` après un appui long : sans cette
+        // remise à zéro, le drapeau resterait vrai et avalerait le tap suivant.
+        longPressed.current = false;
+        origin.current = { x: e.clientX, y: e.clientY };
         timer.current = setTimeout(
           () => {
+            timer.current = null;
             longPressed.current = touch;
-            showInspect(cardId, board);
+            showInspect(cardId, board, touch);
           },
           touch ? HOLD_DELAY : HOVER_DELAY,
         );
       };
-      const stop = () => {
-        clear();
-        hideInspect();
+
+      const moved = (e: PointerEvent) => {
+        const o = origin.current;
+        if (!o) return true;
+        return Math.abs(e.clientX - o.x) > MOVE_TOLERANCE || Math.abs(e.clientY - o.y) > MOVE_TOLERANCE;
       };
+
       return {
         onPointerEnter: (e) => {
-          if (e.pointerType === 'mouse') start(false);
+          if (e.pointerType === 'mouse') arm(e, false);
         },
-        // Filet de sécurité : si la carte apparaît sous un curseur immobile
-        // (re-render après un mulligan, décalage de mise en page…), aucun
-        // `pointerenter` n'est émis. Le moindre mouvement relance donc le délai.
+        // La souris doit rester immobile : tout déplacement relance le compteur.
         onPointerMove: (e) => {
-          if (e.pointerType === 'mouse' && !timer.current) start(false);
+          if (e.pointerType !== 'mouse') {
+            // Au doigt, un glissement = défilement : on annule l'appui long.
+            if (timer.current && moved(e)) clear();
+            return;
+          }
+          if (!timer.current) {
+            // Rien d'armé : soit le zoom est déjà ouvert, soit la carte vient
+            // d'apparaître sous un curseur immobile — on (re)démarre.
+            if (!useStore.getState().inspect) arm(e, false);
+            return;
+          }
+          if (moved(e)) arm(e, false);
         },
         onPointerLeave: (e) => {
-          if (e.pointerType === 'mouse') stop();
+          if (e.pointerType !== 'mouse') return;
+          clear();
+          hideInspect();
         },
         onPointerDown: (e) => {
-          if (e.pointerType !== 'mouse') start(true);
+          if (e.pointerType !== 'mouse') arm(e, true);
         },
         onPointerUp: (e) => {
-          if (e.pointerType !== 'mouse') stop();
+          if (e.pointerType === 'mouse') return;
+          clear();
+          // Un appui long a ouvert le zoom épinglé : on le laisse affiché.
+          if (!longPressed.current) hideInspect();
         },
-        onPointerCancel: stop,
-        // Empêche le menu contextuel iOS/Android pendant l'appui long.
-        onContextMenu: (e) => e.preventDefault(),
+        onPointerCancel: () => {
+          clear();
+          hideInspect();
+        },
+        // Clic droit : ouverture immédiate et épinglée, au lieu du menu système.
+        onContextMenu: (e) => {
+          e.preventDefault();
+          if (cardId) showInspect(cardId, board, true);
+        },
       };
     },
     [clear, hideInspect, showInspect],
@@ -87,15 +130,26 @@ export function useInspectFactory() {
   const consumeLongPress = useCallback(() => {
     if (!longPressed.current) return false;
     longPressed.current = false;
-    hideInspect();
     return true;
-  }, [hideInspect]);
+  }, []);
 
-  return { inspectFor, consumeLongPress };
+  /** Ouverture explicite (clic sur une carte sans action). */
+  const pinInspect = useCallback(
+    (cardId: string | undefined, board?: BoardCard) => {
+      if (cardId) showInspect(cardId, board, true);
+    },
+    [showInspect],
+  );
+
+  return { inspectFor, consumeLongPress, pinInspect };
 }
 
 /** Variante pour une carte unique. */
 export function useInspect(cardId: string | undefined, board?: BoardCard) {
-  const { inspectFor, consumeLongPress } = useInspectFactory();
-  return { handlers: inspectFor(cardId, board), consumeLongPress };
+  const { inspectFor, consumeLongPress, pinInspect } = useInspectFactory();
+  return {
+    handlers: inspectFor(cardId, board),
+    consumeLongPress,
+    pin: () => pinInspect(cardId, board),
+  };
 }

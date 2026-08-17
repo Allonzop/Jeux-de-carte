@@ -86,7 +86,7 @@ export default function CardView({
 }: Props) {
   const def = useMemo(() => (cardId ? getCard(cardId) : undefined), [cardId]);
   const anchorProps = anchorKey && anchorId ? { [`data-${anchorKey}`]: anchorId } : {};
-  const { handlers: inspectHandlers, consumeLongPress } = useInspect(noInspect ? undefined : cardId, board);
+  const { handlers: inspectHandlers, consumeLongPress, pin } = useInspect(noInspect ? undefined : cardId, board);
 
   // Floating damage / heal number when a board card's HP changes.
   const [float, setFloat] = useState<{ n: number; heal: boolean; key: number } | null>(null);
@@ -168,7 +168,12 @@ export default function CardView({
       onClick={() => {
         // Un appui long vient d'ouvrir le zoom : on n'exécute pas l'action.
         if (consumeLongPress()) return;
-        onClick?.();
+        if (onClick) {
+          onClick();
+          return;
+        }
+        // Carte sans action possible : le clic sert alors à l'inspecter.
+        if (!noInspect) pin();
       }}
       title={tooltip}
       // Le zoom doit rester accessible même sur une carte non cliquable.
@@ -177,8 +182,10 @@ export default function CardView({
       {...inspectHandlers}
       style={enterDelay && !entered ? { animationDelay: `${enterDelay}ms` } : undefined}
       className={`card-frame group relative ${SIZES[size]} aspect-[3/4] overflow-hidden shadow-card transition-transform duration-150 ${
-        onClick ? '' : 'cursor-default'
-      } ${HIGHLIGHT[highlight]} ${dimmed ? 'opacity-60 grayscale' : ''} ${marked ? 'brightness-[0.45]' : ''} ${anim}`}
+        onClick ? '' : noInspect ? 'cursor-default' : 'cursor-zoom-in'
+      } ${HIGHLIGHT[highlight]} ${
+        dimmed ? 'opacity-60 grayscale' : ''
+      } ${marked ? 'brightness-[0.45]' : ''} ${anim}`}
     >
       <img src={cardImg(def.image)} alt={def.name} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
 

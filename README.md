@@ -254,10 +254,23 @@ les évènements sont déduits en comparant deux états successifs du serveur
 
 ## 👁️ Lisibilité en jeu
 
-- **Zoom d'inspection** (façon Hearthstone) : survol de la souris ~0,5 s sur
-  desktop, **appui long** ~0,4 s sur mobile. Affiche la carte en grand avec son
-  nom, rang, type, PV/attaque courants, son attaque et sa description. Actif
-  partout : main, plateau, cimetière, deck builder.
+- **Zoom d'inspection.** Il ne doit jamais surgir pendant qu'on joue : il n'y a
+  donc que des ouvertures volontaires.
+
+  | Geste | Effet |
+  |---|---|
+  | **Clic droit** (ordinateur) | Ouvre tout de suite, et **reste affiché** |
+  | **Clic** sur une carte sans action possible | Idem |
+  | **Appui long ~0,7 s** (mobile) | Idem — plus long qu'un tap ordinaire, annulé si le doigt glisse |
+  | **Souris immobile 3 s** | Ouvre, et se referme quand on s'éloigne |
+
+  Un zoom ouvert volontairement se ferme d'un clic / tap n'importe où, ou avec
+  **Échap**. Les deux délais sont deux constantes en tête de
+  `client/src/lib/useInspect.ts`.
+
+  La carte s'affiche en grand avec son nom, rang, type, PV/attaque courants, son
+  attaque et sa description. Actif partout : main, plateau, cimetière, deck
+  builder.
 - **Effets actifs lisibles** : pastilles d'état sur les cartes du plateau
   (🛡 provocation, ☠ poison, 💤 mal d'invocation, ⛔ bloquée, ⚔/❤ bonus),
   badges chiffrés (`+80⚔`), et section **« Effets en cours »** dans le zoom qui

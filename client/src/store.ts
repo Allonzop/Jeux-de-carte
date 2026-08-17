@@ -29,8 +29,12 @@ interface StoreState {
   error: string | null;
   interaction: Interaction;
   pointer: { x: number; y: number };
-  /** Carte affichée en grand (survol prolongé sur desktop, appui long sur mobile). */
-  inspect: { cardId: string; board?: BoardCard } | null;
+  /**
+   * Carte affichée en grand. `sticky` = ouverture volontaire (clic droit, clic,
+   * appui long) : elle reste à l'écran jusqu'à fermeture explicite, alors qu'un
+   * simple survol se referme dès que la souris s'éloigne.
+   */
+  inspect: { cardId: string; board?: BoardCard; sticky?: boolean } | null;
   /** Dernière attaque repérée entre deux états — sert à animer la charge. */
   lastAttack: AttackFx | null;
 
@@ -58,8 +62,9 @@ interface StoreState {
 
   setPointer: (x: number, y: number) => void;
   clearError: () => void;
-  showInspect: (cardId: string, board?: BoardCard) => void;
-  hideInspect: () => void;
+  showInspect: (cardId: string, board?: BoardCard, sticky?: boolean) => void;
+  /** Ferme le zoom. `force` ferme aussi un zoom épinglé. */
+  hideInspect: (force?: boolean) => void;
 }
 
 function tokenKey(roomId: string) {
@@ -181,6 +186,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setPointer: (x, y) => set({ pointer: { x, y } }),
   clearError: () => set({ error: null }),
-  showInspect: (cardId, board) => set({ inspect: { cardId, board } }),
-  hideInspect: () => set({ inspect: null }),
+  showInspect: (cardId, board, sticky) => set({ inspect: { cardId, board, sticky } }),
+  hideInspect: (force) =>
+    set((s) => (s.inspect?.sticky && !force ? s : { inspect: null })),
 }));

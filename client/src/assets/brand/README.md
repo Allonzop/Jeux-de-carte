@@ -1,18 +1,21 @@
 # Assets de marque
 
-## `logo.*` — le logo BOLOSS
+## Le logo BOLOSS
 
-Dépose ici le fichier du logo sous le nom **`logo.jpg`** (ou `.png`, `.webp`,
-`.svg` — le premier format trouvé gagne, dans cet ordre : `png`, `webp`, `jpg`,
-`jpeg`, `svg`).
+**Dépose simplement le fichier image dans ce dossier.** Pas besoin de le
+renommer : `LOGO 2 (1).jpg` fonctionne tel quel.
 
 ```
-client/src/assets/brand/logo.png   ← ton fichier « LOGO 2 (1).jpg » renommé
+client/src/assets/brand/LOGO 2 (1).jpg     ← ça suffit
 ```
 
 Il est ensuite repris **automatiquement partout** dans l'interface (accueil,
-salon, barre de jeu, écran de chargement) : le composant `Logo` le détecte au
-build via `import.meta.glob`, pas besoin de toucher au code.
+salon, barre de jeu, écran de chargement) : le composant `Logo` détecte au build
+(`import.meta.glob`) n'importe quel `.png` / `.webp` / `.jpg` / `.jpeg` / `.svg`
+posé ici. Aucun code à toucher.
+
+S'il y a plusieurs images dans le dossier, celle dont le nom contient « logo »
+gagne, et à défaut le format le plus propre (`png` avant `jpg`).
 
 Tant qu'aucun fichier n'est présent, l'interface affiche un **logo typographique
 de secours** — rien ne casse.

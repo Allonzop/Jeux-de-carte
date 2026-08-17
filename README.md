@@ -201,18 +201,22 @@ Le mot « BOLOSS » n'est plus écrit en dur nulle part : tous les emplacements
 (accueil, salon, barre de jeu, écran de chargement) passent par le composant
 [`client/src/components/Logo.tsx`](client/src/components/Logo.tsx).
 
-**Pour mettre ton logo :** dépose le fichier ici, sous le nom `logo` —
+**Pour mettre ton logo :** dépose le fichier image dans ce dossier —
 
 ```
-client/src/assets/brand/logo.png      ← ou .webp / .jpg / .svg
+client/src/assets/brand/       ← n'importe quel .png / .webp / .jpg / .svg
 ```
 
-…et c'est tout. Le composant le détecte **au build** (`import.meta.glob`), il
-apparaît partout, et le **ratio est préservé** : chaque emplacement impose une
-hauteur, la largeur suit (`object-contain`). Tant qu'aucun fichier n'est
-présent, un logo typographique de secours prend le relais — rien ne casse.
-Voir [`client/src/assets/brand/README.md`](client/src/assets/brand/README.md)
-pour les recommandations (fond transparent, format paysage).
+…et c'est tout, **sans le renommer** : `LOGO 2 (1).jpg` est repris tel quel. Le
+composant détecte le fichier **au build** (`import.meta.glob`), il apparaît
+partout, et le **ratio est préservé** : chaque emplacement impose une hauteur,
+la largeur suit (`object-contain`). Tant qu'aucun fichier n'est présent, un logo
+typographique de secours prend le relais — rien ne casse. Voir
+[`client/src/assets/brand/README.md`](client/src/assets/brand/README.md) pour
+les recommandations (fond transparent, format paysage).
+
+> Le plus simple si tu n'as pas le repo en local : sur GitHub, ouvre le dossier
+> `client/src/assets/brand/` sur la branche, puis **Add file → Upload files**.
 
 ### L'écran de chargement
 

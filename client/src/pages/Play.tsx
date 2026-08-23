@@ -6,6 +6,7 @@ import {
   getCard,
   getPlayRequirement,
   MAX_BOARD,
+  legalHandPicks,
   playBlockedReason,
   type BoardCard,
   type CardInstance,
@@ -116,6 +117,16 @@ function Board({ game }: { game: RedactedGameState }) {
   const playableHand = useMemo(() => {
     const set = new Set<string>();
     if (!myTurn || game.phase !== 'MAIN') return set;
+    // Seconde désignation (Envie) : seules les invocations éligibles s'allument.
+    if (interaction.mode === 'play-hand-target') {
+      const src = me.hand.find((c) => c && c.instanceId === interaction.handInstanceId) as CardInstance | undefined;
+      if (src) {
+        for (const c of legalHandPicks(game as unknown as GameState, you, getCard(src.cardId), src.instanceId)) {
+          set.add(c.instanceId);
+        }
+      }
+      return set;
+    }
     for (const inst of me.hand) {
       if (!inst) continue;
       const def = getCard(inst.cardId);
@@ -133,7 +144,7 @@ function Board({ game }: { game: RedactedGameState }) {
       if (ok) set.add(inst.instanceId);
     }
     return set;
-  }, [game, me.hand, me.board, myTurn, you]);
+  }, [game, me.hand, me.board, myTurn, you, interaction]);
 
   // ---- Per-character highlight + click ---------------------------------
   function charHighlight(c: BoardCard): Highlight {
@@ -212,6 +223,9 @@ function Board({ game }: { game: RedactedGameState }) {
 
       {/* Confirmation avant de jouer une carte sans cible */}
       <ConfirmPlayBar hand={me.hand} interaction={interaction} />
+
+      {/* 2e désignation : quelle carte de la main prend la place */}
+      <HandPickBar interaction={interaction} />
 
       {/* Your hand */}
       <Hand hand={me.hand} playable={playableHand} interaction={interaction} onPlay={selectHandCard} />
@@ -521,7 +535,9 @@ function Hand({
         if (!inst) return null;
         const isPlayable = playable.has(inst.instanceId);
         const isSelected =
-          (interaction.mode === 'play-target' || interaction.mode === 'confirm-play') &&
+          (interaction.mode === 'play-target' ||
+            interaction.mode === 'confirm-play' ||
+            interaction.mode === 'play-hand-target') &&
           interaction.handInstanceId === inst.instanceId;
         return (
           <div
@@ -543,6 +559,31 @@ function Hand({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Consigne pendant la 2e désignation (Envie choisit qui prend la place). */
+function HandPickBar({
+  interaction,
+}: {
+  interaction: ReturnType<typeof useStore.getState>['interaction'];
+}) {
+  const cancelInteraction = useStore((s) => s.cancelInteraction);
+  if (interaction.mode !== 'play-hand-target') return null;
+  return (
+    <div className="flex justify-center px-3 pb-1">
+      <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-boloss-gold/40 bg-felt-800/95 px-3 py-2 shadow-lg">
+        <div className="min-w-0 flex-1 font-display text-lg text-boloss-gold">
+          Quelle invocation prend sa place ?
+        </div>
+        <button
+          onClick={cancelInteraction}
+          className="shrink-0 rounded-lg border border-white/20 px-3 py-2 text-sm text-white/70 transition active:scale-95"
+        >
+          Annuler
+        </button>
+      </div>
     </div>
   );
 }

@@ -242,7 +242,15 @@ export type GameAction =
   | { type: 'SETUP_PLACE'; instanceId: string }
   | { type: 'SETUP_UNPLACE'; instanceId: string }
   | { type: 'SETUP_DONE' }
-  | { type: 'PLAY_CARD'; instanceId: string; targetInstanceId?: string; slotIndex?: number }
+  | {
+      type: 'PLAY_CARD';
+      instanceId: string;
+      /** Cible sur le plateau. */
+      targetInstanceId?: string;
+      /** Seconde cible, prise dans la main (Envie choisit l'invocation qui arrive). */
+      handTargetInstanceId?: string;
+      slotIndex?: number;
+    }
   | { type: 'ATTACK'; attackerInstanceId: string; targetInstanceId: string }
   | { type: 'NEXT_PHASE' }
   | { type: 'END_TURN' };

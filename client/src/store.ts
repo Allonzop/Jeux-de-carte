@@ -20,6 +20,8 @@ export type Interaction =
   /** Carte sans cible sélectionnée : il faut confirmer pour la jouer. */
   | { mode: 'confirm-play'; handInstanceId: string }
   | { mode: 'play-target'; handInstanceId: string }
+  /** Cible du plateau choisie ; reste à désigner une carte de sa main (Envie). */
+  | { mode: 'play-hand-target'; handInstanceId: string; boardTargetId: string }
   | { mode: 'attack'; attackerInstanceId: string };
 
 interface StoreState {
@@ -145,6 +147,22 @@ export const useStore = create<StoreState>((set, get) => ({
     const { game, you, interaction, socket } = get();
     if (!game || !you) return;
 
+    // Seconde désignation en cours : ce clic choisit la carte de la main.
+    if (interaction.mode === 'play-hand-target') {
+      if (handInstanceId === interaction.handInstanceId) {
+        set({ interaction: { mode: 'idle' } });
+        return;
+      }
+      socket?.emit('action', {
+        type: 'PLAY_CARD',
+        instanceId: interaction.handInstanceId,
+        targetInstanceId: interaction.boardTargetId,
+        handTargetInstanceId: handInstanceId,
+      } as GameAction);
+      set({ interaction: { mode: 'idle' } });
+      return;
+    }
+
     // 2e clic sur une carte déjà sélectionnée et sans cible : on joue.
     if (interaction.mode === 'confirm-play' && interaction.handInstanceId === handInstanceId) {
       socket?.emit('action', { type: 'PLAY_CARD', instanceId: handInstanceId } as GameAction);
@@ -194,8 +212,15 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   chooseTarget: (targetInstanceId) => {
-    const { interaction, socket } = get();
+    const { interaction, socket, game, you } = get();
     if (interaction.mode === 'play-target') {
+      const inst = game && you ? game.players[you].hand.find((c) => c && c.instanceId === interaction.handInstanceId) : null;
+      const def = inst ? getCard(inst.cardId) : null;
+      // Envie demande une 2e désignation : quelle carte de la main prend la place.
+      if (def && getPlayRequirement(def).handPick) {
+        set({ interaction: { mode: 'play-hand-target', handInstanceId: interaction.handInstanceId, boardTargetId: targetInstanceId } });
+        return;
+      }
       const action: GameAction = { type: 'PLAY_CARD', instanceId: interaction.handInstanceId, targetInstanceId };
       socket?.emit('action', action);
     } else if (interaction.mode === 'attack') {

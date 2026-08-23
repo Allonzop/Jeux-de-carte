@@ -533,13 +533,18 @@ export interface PlayRequirement {
   side: 'ALLY' | 'ENEMY' | 'ANY';
   kind: 'CHARACTER' | 'INVOCATION';
   faction?: Faction; // restrict target to a faction (e.g. Champ de Bataille Floral)
+  /**
+   * Certaines cartes demandent AUSSI de désigner une carte de sa propre main —
+   * Envie doit savoir quelle invocation vient prendre la place.
+   */
+  handPick?: 'BASIC_INVOCATION';
 }
 
 const SPECIAL_ACT_REQUIREMENTS: Record<string, PlayRequirement> = {
   soldat_dios_mios: { needsTarget: true, side: 'ENEMY', kind: 'INVOCATION' },
   soldat_reboot: { needsTarget: true, side: 'ALLY', kind: 'INVOCATION' },
   soldat_contract_revo: { needsTarget: true, side: 'ENEMY', kind: 'INVOCATION' },
-  avocat_envie: { needsTarget: true, side: 'ALLY', kind: 'INVOCATION' },
+  avocat_envie: { needsTarget: true, side: 'ALLY', kind: 'INVOCATION', handPick: 'BASIC_INVOCATION' },
   floral_coup_pression: { needsTarget: true, side: 'ALLY', kind: 'INVOCATION' },
 };
 
@@ -626,6 +631,23 @@ export function playBlockedReason(state: GameState, playerId: PlayerId, def: Car
     default:
       return null;
   }
+}
+
+/**
+ * Cartes de la main que le joueur peut désigner comme seconde cible.
+ * `exclude` écarte la carte en train d'être jouée.
+ */
+export function legalHandPicks(
+  state: GameState,
+  playerId: PlayerId,
+  def: CardDef,
+  exclude?: string,
+): CardInstance[] {
+  const req = getPlayRequirement(def);
+  if (req.handPick !== 'BASIC_INVOCATION') return [];
+  return state.players[playerId].hand.filter(
+    (c) => c.instanceId !== exclude && isBasicInvocationId(c.cardId),
+  );
 }
 
 /** Board characters that are legal targets for the given play requirement. */
@@ -954,7 +976,13 @@ function requirePlaying(state: GameState, playerId: PlayerId): ActionResult | nu
   return null;
 }
 
-function playCard(state: GameState, playerId: PlayerId, instanceId: string, targetInstanceId?: string): ActionResult {
+function playCard(
+  state: GameState,
+  playerId: PlayerId,
+  instanceId: string,
+  targetInstanceId?: string,
+  handTargetInstanceId?: string,
+): ActionResult {
   const guard = requirePlaying(state, playerId);
   if (guard) return guard;
   if (state.phase !== 'MAIN') return { ok: false, error: 'Les cartes se jouent en Phase Principale.' };
@@ -970,7 +998,7 @@ function playCard(state: GameState, playerId: PlayerId, instanceId: string, targ
 
   if (def.type === 'INVOCATION') return playInvocation(state, playerId, handIdx, inst, def);
   if (def.type === 'OBJET') return playObject(state, playerId, handIdx, inst, def, targetInstanceId);
-  if (def.type === 'ACT') return playAct(state, playerId, handIdx, inst, def, targetInstanceId);
+  if (def.type === 'ACT') return playAct(state, playerId, handIdx, inst, def, targetInstanceId, handTargetInstanceId);
   return { ok: false, error: 'Type de carte injouable.' };
 }
 
@@ -1035,7 +1063,15 @@ function playObject(state: GameState, playerId: PlayerId, handIdx: number, inst:
   return { ok: true };
 }
 
-function playAct(state: GameState, playerId: PlayerId, handIdx: number, inst: CardInstance, def: CardDef, targetInstanceId?: string): ActionResult {
+function playAct(
+  state: GameState,
+  playerId: PlayerId,
+  handIdx: number,
+  inst: CardInstance,
+  def: CardDef,
+  targetInstanceId?: string,
+  handTargetInstanceId?: string,
+): ActionResult {
   const res = resolveTarget(state, playerId, def, targetInstanceId);
   if (!res.ok) return { ok: false, error: res.error };
   const target = res.target;
@@ -1049,7 +1085,7 @@ function playAct(state: GameState, playerId: PlayerId, handIdx: number, inst: Ca
 
   // Bespoke ACTs.
   if (SPECIAL_ACT_IDS.has(def.id)) {
-    const special = resolveSpecialAct(state, playerId, def, target);
+    const special = resolveSpecialAct(state, playerId, def, target, handTargetInstanceId);
     if (!special.ok) {
       p.hand.splice(handIdx, 0, inst);
       return special;
@@ -1072,7 +1108,13 @@ function playAct(state: GameState, playerId: PlayerId, handIdx: number, inst: Ca
   return { ok: true };
 }
 
-function resolveSpecialAct(state: GameState, playerId: PlayerId, def: CardDef, target: BoardCard | undefined): ActionResult {
+function resolveSpecialAct(
+  state: GameState,
+  playerId: PlayerId,
+  def: CardDef,
+  target: BoardCard | undefined,
+  handTargetInstanceId?: string,
+): ActionResult {
   const p = state.players[playerId];
   switch (def.id) {
     case 'soldat_dios_mios': {
@@ -1163,21 +1205,25 @@ function resolveSpecialAct(state: GameState, playerId: PlayerId, def: CardDef, t
       return { ok: true };
     }
     case 'avocat_envie': {
-      // Renvoie l'invocation ciblée dans la main, et pose la 1re invocation jouable de la main.
-      if (!target) return { ok: false, error: 'Choisis une de tes invocations.' };
+      // Le joueur désigne lui-même l'invocation de sa main qui prend la place.
+      if (!target) return { ok: false, error: 'Choisis une de tes invocations sur le plateau.' };
+      const swapIdx = handTargetInstanceId
+        ? p.hand.findIndex((c) => c.instanceId === handTargetInstanceId)
+        : -1;
+      if (swapIdx < 0) return { ok: false, error: 'Choisis l\'invocation de ta main qui prend sa place.' };
+      if (!isBasicInvocationId(p.hand[swapIdx].cardId)) {
+        return { ok: false, error: 'Seule une invocation sans condition peut prendre la place.' };
+      }
+
       p.board = p.board.filter((c) => c.instanceId !== target.instanceId);
       for (const eq of [...target.equipment]) removeEquipment(state, target, eq, true);
+      const arriving = p.hand.splice(swapIdx, 1)[0];
       p.hand.push({ instanceId: target.instanceId, cardId: target.cardId });
-      const swapIdx = p.hand.findIndex((c) => getCard(c.cardId).type === 'INVOCATION' && !getCard(c.cardId).summoningConditions?.length && c.instanceId !== target.instanceId);
-      if (swapIdx >= 0) {
-        const inst = p.hand.splice(swapIdx, 1)[0];
-        const bc = makeBoardCard(state, inst.cardId, playerId, true);
-        bc.instanceId = inst.instanceId;
-        p.board.push(bc);
-        log(state, `Envie : ${cardDef(target).name} retourne en main, ${getCard(inst.cardId).name} arrive.`, playerId);
-      } else {
-        log(state, `Envie : ${cardDef(target).name} retourne en main.`, playerId);
-      }
+
+      const bc = makeBoardCard(state, arriving.cardId, playerId, true);
+      bc.instanceId = arriving.instanceId;
+      p.board.push(bc);
+      log(state, `Envie : ${cardDef(target).name} retourne en main, ${getCard(arriving.cardId).name} arrive.`, playerId);
       recomputeAuras(state);
       return { ok: true };
     }
@@ -1256,7 +1302,7 @@ export function applyAction(state: GameState, playerId: PlayerId, action: GameAc
     case 'SETUP_DONE':
       return setupDone(state, playerId);
     case 'PLAY_CARD':
-      return playCard(state, playerId, action.instanceId, action.targetInstanceId);
+      return playCard(state, playerId, action.instanceId, action.targetInstanceId, action.handTargetInstanceId);
     case 'ATTACK':
       return attack(state, playerId, action.attackerInstanceId, action.targetInstanceId);
     case 'NEXT_PHASE': {

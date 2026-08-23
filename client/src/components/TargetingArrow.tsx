@@ -7,7 +7,8 @@ export default function TargetingArrow() {
 
   // Pas de flèche tant qu'on n'a pas de cible à désigner : la confirmation
   // d'une carte sans cible n'en a pas besoin.
-  if (interaction.mode === 'idle' || interaction.mode === 'confirm-play') return null;
+  if (interaction.mode === 'idle' || interaction.mode === 'confirm-play' || interaction.mode === 'play-hand-target')
+    return null;
 
   const selector =
     interaction.mode === 'play-target'

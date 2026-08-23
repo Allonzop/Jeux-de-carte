@@ -45,12 +45,19 @@ export function legalPlayTargetIds(game: RedactedGameState, def: CardDef): Set<s
   return new Set(pool.map((c) => c.instanceId));
 }
 
-/** Enemy characters that can be attacked right now (respecting taunt). */
+/**
+ * Cibles d'attaque légales, **exactement** la règle du moteur (sinon on
+ * surligne en rouge une carte que le serveur refusera ensuite) :
+ *  - provocation globale : le héros est intouchable tant qu'il reste une seule
+ *    invocation adverse sur le plateau ;
+ *  - une carte avec le mot-clé Provocation passe avant les autres invocations.
+ */
 export function legalAttackTargetIds(game: RedactedGameState): Set<string> {
   const foe = game.players[OTHER[game.you]];
   const taunts = foe.board.filter((c) => hasTaunt(c));
-  const pool = taunts.length > 0 ? taunts : [foe.hero, ...foe.board].filter(Boolean) as BoardCard[];
-  return new Set(pool.map((c) => c.instanceId));
+  if (taunts.length > 0) return new Set(taunts.map((c) => c.instanceId));
+  if (foe.board.length > 0) return new Set(foe.board.map((c) => c.instanceId));
+  return new Set(foe.hero ? [foe.hero.instanceId] : []);
 }
 
 export function canAttackWith(game: RedactedGameState, card: BoardCard): boolean {

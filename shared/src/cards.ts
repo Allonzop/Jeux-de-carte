@@ -68,8 +68,12 @@ const CARDS: CardDef[] = [
     type: 'OBJET',
     rank: 'B',
     image: 'avocat_contract_fourberie.jpg',
-    effectText: "Fourberie de Satan — équipe une invocation adverse : elle subit -10 HP pendant 3 tours.",
-    effects: [{ trigger: 'ON_PLAY', action: 'POISON', target: 'ENEMY_INVOCATION', value: 10, duration: 3 }],
+    attackName: 'Fourberie de Satan',
+    // « … pour qu'elle se blesse elle-même pendant 3 tours » : la cible
+    // s'inflige sa PROPRE attaque à chaque début de son tour, pas un forfait.
+    effectText:
+      "Fourberie de Satan — équipe une invocation adverse : elle se blesse elle-même de sa propre attaque à chaque début de son tour, pendant 3 tours.",
+    effects: [{ trigger: 'ON_PLAY', action: 'SELF_HARM', target: 'ENEMY_INVOCATION', duration: 3 }],
   },
   {
     id: 'avocat_poulet_maroille',

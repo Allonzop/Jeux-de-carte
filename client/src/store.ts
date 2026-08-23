@@ -17,6 +17,8 @@ const SERVER_URL: string =
 
 export type Interaction =
   | { mode: 'idle' }
+  /** Carte sans cible sélectionnée : il faut confirmer pour la jouer. */
+  | { mode: 'confirm-play'; handInstanceId: string }
   | { mode: 'play-target'; handInstanceId: string }
   | { mode: 'attack'; attackerInstanceId: string };
 
@@ -53,6 +55,8 @@ interface StoreState {
   setupReady: () => void;
 
   selectHandCard: (handInstanceId: string) => void;
+  /** Valide la pose d'une carte sans cible (2e étape). */
+  confirmPlay: () => void;
   selectAttacker: (attackerInstanceId: string) => void;
   chooseTarget: (targetInstanceId: string) => void;
   cancelInteraction: () => void;
@@ -140,22 +144,44 @@ export const useStore = create<StoreState>((set, get) => ({
   selectHandCard: (handInstanceId) => {
     const { game, you, interaction, socket } = get();
     if (!game || !you) return;
-    // Toggle off if re-selecting the same card.
+
+    // 2e clic sur une carte déjà sélectionnée et sans cible : on joue.
+    if (interaction.mode === 'confirm-play' && interaction.handInstanceId === handInstanceId) {
+      socket?.emit('action', { type: 'PLAY_CARD', instanceId: handInstanceId } as GameAction);
+      set({ interaction: { mode: 'idle' } });
+      return;
+    }
+    // Re-clic sur une carte en attente de cible : on annule.
     if (interaction.mode === 'play-target' && interaction.handInstanceId === handInstanceId) {
       set({ interaction: { mode: 'idle' } });
       return;
     }
+
     const inst = game.players[you].hand.find((c) => c && c.instanceId === handInstanceId);
     if (!inst) return;
     const def = getCard(inst.cardId);
     const req = getPlayRequirement(def);
-    if (!req.needsTarget) {
-      const action: GameAction = { type: 'PLAY_CARD', instanceId: handInstanceId };
-      socket?.emit('action', action);
-      set({ interaction: { mode: 'idle' } });
-    } else {
+    if (req.needsTarget) {
       set({ interaction: { mode: 'play-target', handInstanceId } });
+      return;
     }
+    // Poser une invocation reste immédiat : c'est l'action courante, et une
+    // erreur y est bénigne. En revanche un acte sans cible partait au premier
+    // clic — un simple clic de curiosité suffisait à jouer Paresse ou Orgueil
+    // et à bloquer son propre plateau. Ceux-là demandent une confirmation.
+    if (def.type === 'INVOCATION') {
+      socket?.emit('action', { type: 'PLAY_CARD', instanceId: handInstanceId } as GameAction);
+      set({ interaction: { mode: 'idle' } });
+      return;
+    }
+    set({ interaction: { mode: 'confirm-play', handInstanceId } });
+  },
+
+  confirmPlay: () => {
+    const { interaction, socket } = get();
+    if (interaction.mode !== 'confirm-play') return;
+    socket?.emit('action', { type: 'PLAY_CARD', instanceId: interaction.handInstanceId } as GameAction);
+    set({ interaction: { mode: 'idle' } });
   },
 
   selectAttacker: (attackerInstanceId) => {

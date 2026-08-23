@@ -5,7 +5,9 @@ export default function TargetingArrow() {
   const interaction = useStore((s) => s.interaction);
   const pointer = useStore((s) => s.pointer);
 
-  if (interaction.mode === 'idle') return null;
+  // Pas de flèche tant qu'on n'a pas de cible à désigner : la confirmation
+  // d'une carte sans cible n'en a pas besoin.
+  if (interaction.mode === 'idle' || interaction.mode === 'confirm-play') return null;
 
   const selector =
     interaction.mode === 'play-target'

@@ -585,6 +585,49 @@ export function getPlayRequirement(def: CardDef): PlayRequirement {
   return { needsTarget: false, side: 'ANY', kind: 'CHARACTER' };
 }
 
+/**
+ * Conditions de jeu qui ne portent PAS sur une cible du plateau : contenu de la
+ * main, du deck adverse… Renvoie la raison du blocage, ou null si la carte est
+ * jouable. Le serveur s'en sert pour refuser l'action, le client pour ne pas
+ * proposer la carte — les deux lisent donc exactement la même règle.
+ */
+/** Le deck n'existe que dans l'état complet du serveur (masqué côté client). */
+function deckOrNull(p: PlayerState): CardInstance[] | null {
+  return Array.isArray(p?.deck) ? p.deck : null;
+}
+
+export function playBlockedReason(state: GameState, playerId: PlayerId, def: CardDef): string | null {
+  const p = state.players[playerId];
+  switch (def.id) {
+    case 'avocat_envie': {
+      // « … et pose une invocation de ta main à sa place » : sans invocation en
+      // main, la carte n'aurait que son inconvénient (renvoyer la tienne).
+      if (p.board.length === 0) return "Envie : tu n'as aucune invocation sur le plateau à échanger.";
+      if (!p.hand.some((c) => isBasicInvocationId(c.cardId))) {
+        return 'Envie : il te faut une invocation en main pour prendre la place.';
+      }
+      return null;
+    }
+    // Attention : le client reçoit une vue *redacted* où les decks sont réduits
+    // à un compteur. On ne peut donc pas trancher côté client — on laisse
+    // passer, le serveur (qui a l'état complet) refusera si besoin.
+    case 'avocat_avarice': {
+      const deck = deckOrNull(p);
+      if (!deck) return null;
+      return deck.some((c) => getCard(c.cardId).type === 'OBJET') ? null : 'Avarice : aucun objet dans ton deck.';
+    }
+    case 'avocat_luxure': {
+      const deck = deckOrNull(state.players[OTHER[playerId]]);
+      if (!deck) return null;
+      return deck.some((c) => getCard(c.cardId).type === 'OBJET')
+        ? null
+        : 'Luxure : aucun objet dans le deck adverse.';
+    }
+    default:
+      return null;
+  }
+}
+
 /** Board characters that are legal targets for the given play requirement. */
 export function legalPlayTargets(state: GameState, playerId: PlayerId, def: CardDef): BoardCard[] {
   const req = getPlayRequirement(def);
@@ -669,6 +712,14 @@ function applyPlayEffect(
     case 'POISON': {
       const t = resolveAuto();
       if (t) created.push(addModifier(state, t, { kind: 'POISON', value: effect.value ?? 0, remainingTurns: turns(effect.duration), sourceInstanceId, label: sourceLabel }));
+      break;
+    }
+    case 'SELF_HARM': {
+      // « Se blesse elle-même » : la cible s'inflige sa PROPRE attaque à chaque
+      // début de son tour. La valeur n'est donc pas fixée à la pose, elle est
+      // relue au moment du tic (une cible boostée se fait plus mal).
+      const t = resolveAuto();
+      if (t) created.push(addModifier(state, t, { kind: 'SELF_HARM', remainingTurns: turns(effect.duration), sourceInstanceId, label: sourceLabel }));
       break;
     }
     case 'CANNOT_ATTACK': {
@@ -771,20 +822,31 @@ function summonFromDeck(state: GameState, playerId: PlayerId, cardId: string, la
  *  Turn structure
  * ------------------------------------------------------------------ */
 
+/**
+ * Pioche `count` cartes.
+ *
+ * Main pleine : la carte **reste sur le dessus du deck**, elle n'est pas
+ * défaussée. La main d'ouverture étant déjà à la limite (10), la brûler
+ * envoyait une carte au cimetière dès le premier tour, sans que le joueur ait
+ * rien fait — comportement incompréhensible en jeu.
+ */
 function drawCards(state: GameState, playerId: PlayerId, count: number): void {
   const p = state.players[playerId];
+  let skipped = 0;
   for (let i = 0; i < count; i++) {
+    if (p.hand.length >= MAX_HAND) {
+      skipped++;
+      continue;
+    }
     const card = p.deck.shift();
     if (!card) {
       log(state, `${p.name} n'a plus de cartes à piocher !`, playerId);
       continue;
     }
-    if (p.hand.length >= MAX_HAND) {
-      p.graveyard.push(card);
-      log(state, `Main pleine — ${getCard(card.cardId).name} est défaussé.`, playerId);
-    } else {
-      p.hand.push(card);
-    }
+    p.hand.push(card);
+  }
+  if (skipped > 0) {
+    log(state, `Main pleine (${MAX_HAND}) — ${skipped} pioche(s) reportée(s), rien n'est perdu.`, playerId);
   }
 }
 
@@ -802,12 +864,13 @@ export function beginTurn(state: GameState, playerId: PlayerId, firstTurn = fals
     c.extraAttacks = 0;
   }
 
-  // Start-of-turn: poison ticks + per-turn attack growth (Culture de l'Aura).
+  // Start-of-turn: poison / auto-blessure + per-turn attack growth.
   for (const c of [...chars]) {
-    // Poison.
     for (const m of [...c.modifiers]) {
-      if (m.kind !== 'POISON') continue;
-      dealDamage(state, c, m.value ?? 0, 'Poison');
+      if (m.kind !== 'POISON' && m.kind !== 'SELF_HARM') continue;
+      // L'auto-blessure vaut l'attaque COURANTE de la carte, relue à chaque tic.
+      const amount = m.kind === 'SELF_HARM' ? attackOf(c) : m.value ?? 0;
+      dealDamage(state, c, amount, m.kind === 'SELF_HARM' ? m.label ?? 'Auto-blessure' : 'Poison');
       if (c.hp <= 0) break;
       if (m.remainingTurns !== null) {
         m.remainingTurns -= 1;
@@ -835,7 +898,8 @@ function decrementTempModifiers(state: GameState, playerId: PlayerId): void {
   for (const c of chars) {
     for (const m of [...c.modifiers]) {
       if (m.fromAura || m.remainingTurns === null) continue;
-      if (m.kind === 'POISON') continue; // handled at turn start
+      // Poison et auto-blessure sont décomptés à leur tic, en début de tour.
+      if (m.kind === 'POISON' || m.kind === 'SELF_HARM') continue;
       m.remainingTurns -= 1;
       if (m.remainingTurns <= 0) removeModifierById(c, m.id);
     }
@@ -900,6 +964,9 @@ function playCard(state: GameState, playerId: PlayerId, instanceId: string, targ
   if (handIdx < 0) return { ok: false, error: 'Carte introuvable dans ta main.' };
   const inst = p.hand[handIdx];
   const def = getCard(inst.cardId);
+
+  const blocked = playBlockedReason(state, playerId, def);
+  if (blocked) return { ok: false, error: blocked };
 
   if (def.type === 'INVOCATION') return playInvocation(state, playerId, handIdx, inst, def);
   if (def.type === 'OBJET') return playObject(state, playerId, handIdx, inst, def, targetInstanceId);
@@ -975,17 +1042,24 @@ function playAct(state: GameState, playerId: PlayerId, handIdx: number, inst: Ca
 
   const p = state.players[playerId];
 
+  // La carte quitte la main AVANT résolution : sinon elle occupe encore un
+  // emplacement et fausse les effets qui remplissent la main (Avarice, Luxure,
+  // Reboot). En cas d'échec elle est remise exactement là où elle était.
+  p.hand.splice(handIdx, 1);
+
   // Bespoke ACTs.
   if (SPECIAL_ACT_IDS.has(def.id)) {
     const special = resolveSpecialAct(state, playerId, def, target);
-    if (!special.ok) return special;
+    if (!special.ok) {
+      p.hand.splice(handIdx, 0, inst);
+      return special;
+    }
   } else {
     for (const e of def.effects ?? []) {
       if (e.trigger === 'ON_PLAY') applyPlayEffect(state, playerId, e, target, undefined, def.name);
     }
   }
 
-  p.hand.splice(handIdx, 1);
   p.graveyard.push(inst);
   if ((def.tags ?? []).includes('sin') && !p.sinsPlayed.includes(def.id)) {
     p.sinsPlayed.push(def.id);
@@ -1009,11 +1083,12 @@ function resolveSpecialAct(state: GameState, playerId: PlayerId, def: CardDef, t
     }
     case 'soldat_reboot': {
       if (!target || target.equipment.length === 0) return { ok: false, error: 'Choisis une invocation équipée.' };
+      // Plutôt que de détruire l'objet récupéré, on refuse : rien ne se perd.
+      if (p.hand.length >= MAX_HAND) return { ok: false, error: 'Ta main est pleine, tu ne peux pas récupérer l\'objet.' };
       const eq = target.equipment[target.equipment.length - 1];
       for (const id of eq.modifierIds) removeModifierById(target, id);
       target.equipment = target.equipment.filter((e) => e.instanceId !== eq.instanceId);
-      if (p.hand.length < MAX_HAND) p.hand.push({ instanceId: eq.instanceId, cardId: eq.cardId });
-      else p.graveyard.push({ instanceId: eq.instanceId, cardId: eq.cardId });
+      p.hand.push({ instanceId: eq.instanceId, cardId: eq.cardId });
       log(state, `Reboot récupère ${getCard(eq.cardId).name} dans la main.`, playerId);
       return { ok: true };
     }
@@ -1067,23 +1142,23 @@ function resolveSpecialAct(state: GameState, playerId: PlayerId, def: CardDef, t
       return { ok: true };
     }
     case 'avocat_luxure': {
+      if (p.hand.length >= MAX_HAND) return { ok: false, error: `Ta main est pleine (${MAX_HAND} cartes).` };
       // Vole un objet du deck adverse et ajoute-le à ta main.
       const foe = state.players[OTHER[playerId]];
       const idx = foe.deck.findIndex((c) => getCard(c.cardId).type === 'OBJET');
       if (idx < 0) return { ok: false, error: 'Aucun objet dans le deck adverse.' };
       const stolen = foe.deck.splice(idx, 1)[0];
-      if (p.hand.length < MAX_HAND) p.hand.push(stolen);
-      else p.graveyard.push(stolen);
+      p.hand.push(stolen);
       log(state, `Luxure vole ${getCard(stolen.cardId).name} du deck adverse.`, playerId);
       return { ok: true };
     }
     case 'avocat_avarice': {
+      if (p.hand.length >= MAX_HAND) return { ok: false, error: `Ta main est pleine (${MAX_HAND} cartes).` };
       // Cherche un objet dans ton deck et ajoute-le à ta main.
       const idx = p.deck.findIndex((c) => getCard(c.cardId).type === 'OBJET');
       if (idx < 0) return { ok: false, error: 'Aucun objet dans ton deck.' };
       const found = p.deck.splice(idx, 1)[0];
-      if (p.hand.length < MAX_HAND) p.hand.push(found);
-      else p.graveyard.push(found);
+      p.hand.push(found);
       log(state, `Avarice récupère ${getCard(found.cardId).name} du deck.`, playerId);
       return { ok: true };
     }

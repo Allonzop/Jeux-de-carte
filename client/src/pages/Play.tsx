@@ -6,6 +6,7 @@ import {
   getCard,
   getPlayRequirement,
   MAX_BOARD,
+  playBlockedReason,
   type BoardCard,
   type CardInstance,
   type GameState,
@@ -123,7 +124,11 @@ function Board({ game }: { game: RedactedGameState }) {
         ok = me.board.length < MAX_BOARD && evaluateConditions(game as unknown as GameState, def, you);
       } else {
         const req = getPlayRequirement(def);
-        ok = !req.needsTarget || legalPlayTargetIds(game, def).size > 0;
+        // `playBlockedReason` couvre ce qui ne se voit pas sur le plateau
+        // (Envie sans invocation en main, Avarice sans objet dans le deck…).
+        ok =
+          !playBlockedReason(game as unknown as GameState, you, def) &&
+          (!req.needsTarget || legalPlayTargetIds(game, def).size > 0);
       }
       if (ok) set.add(inst.instanceId);
     }
@@ -204,6 +209,9 @@ function Board({ game }: { game: RedactedGameState }) {
           <LogPanel log={game.log} you={you} />
         </div>
       </div>
+
+      {/* Confirmation avant de jouer une carte sans cible */}
+      <ConfirmPlayBar hand={me.hand} interaction={interaction} />
 
       {/* Your hand */}
       <Hand hand={me.hand} playable={playableHand} interaction={interaction} onPlay={selectHandCard} />
@@ -512,7 +520,9 @@ function Hand({
       {hand.map((inst, i) => {
         if (!inst) return null;
         const isPlayable = playable.has(inst.instanceId);
-        const isSelected = interaction.mode === 'play-target' && interaction.handInstanceId === inst.instanceId;
+        const isSelected =
+          (interaction.mode === 'play-target' || interaction.mode === 'confirm-play') &&
+          interaction.handInstanceId === inst.instanceId;
         return (
           <div
             key={inst.instanceId}
@@ -533,6 +543,49 @@ function Hand({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Deuxième étape pour les cartes sans cible (les péchés, notamment).
+ * Sans elle, un simple clic de curiosité sur Paresse ou Orgueil suffisait à les
+ * jouer — et à bloquer son propre plateau — sans rien demander.
+ */
+function ConfirmPlayBar({
+  hand,
+  interaction,
+}: {
+  hand: (CardInstance | null)[];
+  interaction: ReturnType<typeof useStore.getState>['interaction'];
+}) {
+  const confirmPlay = useStore((s) => s.confirmPlay);
+  const cancelInteraction = useStore((s) => s.cancelInteraction);
+  if (interaction.mode !== 'confirm-play') return null;
+  const inst = hand.find((c) => c && c.instanceId === interaction.handInstanceId);
+  if (!inst) return null;
+  const def = getCard(inst.cardId);
+
+  return (
+    <div className="flex justify-center px-3 pb-1">
+      <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-boloss-gold/40 bg-felt-800/95 px-3 py-2 shadow-lg">
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-display text-lg text-boloss-gold">Jouer {def.name} ?</div>
+          {def.effectText && <p className="truncate text-[11px] text-white/60">{def.effectText}</p>}
+        </div>
+        <button
+          onClick={confirmPlay}
+          className="shrink-0 rounded-lg bg-boloss-red px-4 py-2 text-sm font-semibold text-white transition active:scale-95"
+        >
+          Jouer
+        </button>
+        <button
+          onClick={cancelInteraction}
+          className="shrink-0 rounded-lg border border-white/20 px-3 py-2 text-sm text-white/70 transition active:scale-95"
+        >
+          Annuler
+        </button>
+      </div>
     </div>
   );
 }

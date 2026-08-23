@@ -45,6 +45,7 @@ export type EffectAction =
   | 'BUFF_ATTACK' // +value attack for `duration` turns (equip / temp)
   | 'BUFF_HP' // +value max & current HP for `duration` turns
   | 'POISON' // deal `value` damage to target at the start of each of its turns
+  | 'SELF_HARM' // target wounds itself with its OWN attack at each of its turn starts
   | 'TAUNT' // passive: enemies must attack this creature
   | 'CHARGE' // passive: can attack the turn it is summoned
   | 'AURA_BUFF' // passive: buff all allied invocations of `faction`
@@ -136,6 +137,8 @@ export type ModifierKind =
   | 'HP' // flat max-hp delta (also heals `value` on apply)
   | 'CANNOT_ATTACK'
   | 'POISON'
+  /** La carte se blesse elle-même de sa propre attaque à chaque début de tour. */
+  | 'SELF_HARM'
   | 'TAUNT'
   | 'GAIN_ATTACK_PER_TURN'
   | 'CHARGE';

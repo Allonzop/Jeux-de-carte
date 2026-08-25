@@ -1,0 +1,794 @@
+<title>Arbitrage BOLOSS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Zilla+Slab:wght@500;600;700&display=swap">
+
+<style>
+  :root {
+    /* Encre et papier : neutres tirés vers le vert du tapis de jeu. */
+    --ink:        #121914;
+    --ink-soft:   #3d4a42;
+    --ink-faint:  #6b786f;
+    --paper:      #f3f1e8;
+    --paper-2:    #eae7db;
+    --rule:       #d5d1c2;
+    --felt:       #1f5b41;
+    --gold:       #a97a1c;
+    --s-red:      #a83248;
+    --s-amber:    #9c6512;
+    --s-grey:     #55665c;
+    --s-red-bg:   #f7e9eb;
+    --s-amber-bg: #f8efdd;
+    --s-grey-bg:  #e9eeea;
+
+    --display: 'Zilla Slab', Georgia, serif;
+    --body: 'Public Sans', system-ui, -apple-system, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --logo: 'Bangers', var(--display);
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:        #e7e4d8;
+      --ink-soft:   #a8b3ab;
+      --ink-faint:  #7d8a82;
+      --paper:      #0e1512;
+      --paper-2:    #16201b;
+      --rule:       #2a3630;
+      --felt:       #6fc79e;
+      --gold:       #e0b055;
+      --s-red:      #f08699;
+      --s-amber:    #e5b45f;
+      --s-grey:     #9fb0a5;
+      --s-red-bg:   #2a181c;
+      --s-amber-bg: #2a2114;
+      --s-grey-bg:  #1a231e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink:        #e7e4d8;
+    --ink-soft:   #a8b3ab;
+    --ink-faint:  #7d8a82;
+    --paper:      #0e1512;
+    --paper-2:    #16201b;
+    --rule:       #2a3630;
+    --felt:       #6fc79e;
+    --gold:       #e0b055;
+    --s-red:      #f08699;
+    --s-amber:    #e5b45f;
+    --s-grey:     #9fb0a5;
+    --s-red-bg:   #2a181c;
+    --s-amber-bg: #2a2114;
+    --s-grey-bg:  #1a231e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 clamp(1rem, 4vw, 3rem) 6rem;
+  }
+
+  /* ---------- Masthead ---------- */
+  .masthead {
+    border-bottom: 3px solid var(--ink);
+    padding: clamp(2rem, 6vw, 3.5rem) 0 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+  .masthead h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2rem, 5.5vw, 3.1rem);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0.35rem 0 0;
+  }
+  .wordmark {
+    font-family: var(--logo);
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .stamp {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--ink-faint);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .stamp b { color: var(--ink-soft); font-weight: 500; }
+
+  .standfirst {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 1.75rem 0 0;
+  }
+
+  /* ---------- Grille : rail + corps ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    margin-top: 2.5rem;
+  }
+  @media (min-width: 940px) {
+    .grid { grid-template-columns: 210px minmax(0, 1fr); gap: 3.5rem; align-items: start; }
+    .rail { position: sticky; top: 1.75rem; }
+  }
+
+  .rail h2 {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 500;
+    margin: 0 0 0.6rem;
+  }
+  .rail ol {
+    list-style: none;
+    margin: 0 0 2rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .rail a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.87rem;
+    display: flex;
+    gap: 0.5rem;
+    border-left: 2px solid var(--rule);
+    padding: 0.1rem 0 0.1rem 0.6rem;
+  }
+  .rail a:hover, .rail a:focus-visible { color: var(--ink); border-left-color: var(--felt); }
+  .rail a span { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-faint); }
+
+  .legend { display: flex; flex-direction: column; gap: 0.55rem; }
+  .legend div { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.8rem; color: var(--ink-soft); line-height: 1.4; }
+
+  /* ---------- Corps ---------- */
+  section { margin-bottom: 3.5rem; scroll-margin-top: 1.5rem; }
+  section > * { max-width: var(--measure); }
+  section > .wide, section > figure { max-width: none; }
+
+  h2.sec {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 0.35rem;
+    padding-top: 1.1rem;
+    border-top: 2px solid var(--ink);
+    display: flex;
+    gap: 0.7rem;
+    align-items: baseline;
+  }
+  h2.sec em {
+    font-family: var(--mono);
+    font-style: normal;
+    font-size: 0.8rem;
+    color: var(--felt);
+    font-weight: 500;
+  }
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.08rem;
+    margin: 2rem 0 0.5rem;
+    line-height: 1.3;
+  }
+  p { margin: 0.75rem 0; }
+  a { color: var(--felt); }
+  strong { font-weight: 600; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--paper-2);
+    padding: 0.08em 0.34em;
+    border-radius: 3px;
+  }
+  ul, ol.body { padding-left: 1.15rem; margin: 0.75rem 0; }
+  li { margin: 0.35rem 0; }
+
+  /* ---------- Fiches d'arbitrage ---------- */
+  .fiche {
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--s-grey);
+    background: var(--paper-2);
+    border-radius: 2px;
+    padding: 1.1rem 1.3rem 1.2rem;
+    margin: 1.5rem 0;
+    max-width: var(--measure);
+  }
+  .fiche.trancher { border-left-color: var(--s-red); }
+  .fiche.interprete { border-left-color: var(--s-amber); }
+
+  .fiche header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+  .fiche h4 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin: 0;
+    line-height: 1.25;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    padding: 0.16rem 0.44rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .tag.trancher { color: var(--s-red); background: var(--s-red-bg); }
+  .tag.interprete { color: var(--s-amber); background: var(--s-amber-bg); }
+  .tag.info { color: var(--s-grey); background: var(--s-grey-bg); }
+
+  .fiche blockquote {
+    margin: 0.7rem 0;
+    padding-left: 0.85rem;
+    border-left: 2px solid var(--rule);
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+  .fiche p { margin: 0.6rem 0 0; font-size: 0.95rem; }
+  .fiche p:first-of-type { margin-top: 0.4rem; }
+  .lbl {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 0.1rem;
+  }
+  .fiche ul { margin: 0.5rem 0 0; font-size: 0.95rem; }
+
+  /* ---------- Tables ---------- */
+  .wide { overflow-x: auto; margin: 1.5rem 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.85rem 0.5rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 500;
+    border-bottom: 1.5px solid var(--ink-soft);
+    white-space: nowrap;
+  }
+  td.num, th.num { text-align: right; padding-right: 1.1rem; }
+  tbody tr.flag td { background: var(--s-red-bg); }
+  tbody tr.flag td:first-child { font-weight: 600; }
+  .bar {
+    display: inline-block;
+    height: 7px;
+    background: var(--felt);
+    border-radius: 1px;
+    vertical-align: middle;
+    margin-right: 0.45rem;
+  }
+  .bar.low { background: var(--s-red); }
+
+  .src {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+    margin-top: 0.6rem;
+  }
+
+  /* ---------- Encart tranché ---------- */
+  .done {
+    border-top: 2px solid var(--felt);
+    background: var(--s-grey-bg);
+    padding: 1.2rem 1.3rem;
+    border-radius: 2px;
+    margin: 1.5rem 0;
+  }
+  .done h3 { margin-top: 0; }
+
+  footer.end {
+    border-top: 3px solid var(--ink);
+    margin-top: 3rem;
+    padding-top: 1.1rem;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+    max-width: none;
+  }
+
+
+  /* ---------- Impression / export PDF ----------
+     Ctrl+P sur la page donne un document propre : une seule colonne, palette
+     claire quel que soit le thème de l'écran, et aucune fiche coupée en deux. */
+  @media print {
+    :root {
+      --ink: #121914; --ink-soft: #3d4a42; --ink-faint: #6b786f;
+      --paper: #ffffff; --paper-2: #f4f2ea; --rule: #cdc9ba;
+      --felt: #1f5b41; --gold: #8a6316;
+      --s-red: #97293d; --s-amber: #8a590d; --s-grey: #4a594f;
+      --s-red-bg: #faeef0; --s-amber-bg: #fbf3e4; --s-grey-bg: #eef2ef;
+    }
+    @page { margin: 14mm 12mm; }
+    body { font-size: 10.5pt; line-height: 1.5; background: #fff; }
+    .sheet { max-width: none; padding: 0; }
+    .grid { display: block; margin-top: 1.2rem; }
+    .rail { display: none; }
+    .masthead { padding-top: 0; }
+    .stamp { white-space: normal; }
+    section { margin-bottom: 1.6rem; }
+    h2.sec { break-after: avoid; page-break-after: avoid; }
+    .fiche, .done, table, blockquote { break-inside: avoid; page-break-inside: avoid; }
+    .fiche { background: var(--paper-2); box-shadow: none; }
+    .wide { overflow: visible; }
+    a { color: inherit; text-decoration: none; }
+  }
+
+  :focus-visible { outline: 2px solid var(--felt); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <div>
+      <div class="wordmark">BOLOSS</div>
+      <div class="kicker">Réglages du jeu · à valider ensemble</div>
+      <h1>Ce qu'il faut décider</h1>
+    </div>
+    <div class="stamp">
+      <b>16</b> points ouverts<br>
+      <b>70</b> cartes · <b>5</b> factions<br>
+      Mis à jour après le playtest
+    </div>
+  </header>
+
+  <p class="standfirst">
+    Pour que le jeu tourne, il a fallu trancher là où les cartes ne disaient
+    rien. Voici chaque décision prise à ta place, ce que ça change quand on
+    joue, et la question à te poser.
+  </p>
+
+  <div class="grid">
+
+    <nav class="rail" aria-label="Sommaire">
+      <h2>Sommaire</h2>
+      <ol>
+        <li><a href="#factions"><span>1</span> Les factions</a></li>
+        <li><a href="#cartes"><span>2</span> Cartes pas sûres</a></li>
+        <li><a href="#regles"><span>3</span> Règles générales</a></li>
+        <li><a href="#decide"><span>4</span> Déjà décidé</a></li>
+        <li><a href="#savoir"><span>5</span> Bon à savoir</a></li>
+      </ol>
+      <h2>Étiquettes</h2>
+      <div class="legend">
+        <div><span class="tag trancher">à décider</span></div>
+        <div><span class="tag info">bon à savoir</span></div>
+      </div>
+    </nav>
+
+    <main>
+
+      <!-- ============ 1 ============ -->
+      <section id="factions">
+        <h2 class="sec"><em>1</em> Les factions ne sont pas à égalité</h2>
+        <p>
+          Un deck se construit tout seul avec les cartes de la faction,
+          <strong>2 exemplaires maximum de chaque</strong> (1 seul pour les rangs
+          S et F). Comme les factions n'ont pas le même nombre de cartes
+          différentes, elles n'ont pas le même deck.
+        </p>
+
+        <div class="wide">
+          <table>
+            <thead>
+              <tr>
+                <th>Faction</th><th class="num">Deck</th>
+                <th class="num">Créatures</th><th class="num">Objets</th><th class="num">Actes</th>
+                <th>Part de créatures</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="flag">
+                <td>Monster Hunter</td><td class="num">20</td>
+                <td class="num">20</td><td class="num">0</td><td class="num">0</td>
+                <td><span class="bar" style="width:70px"></span>100 %</td>
+              </tr>
+              <tr class="flag">
+                <td>Avocat du Diable</td><td class="num">28</td>
+                <td class="num">8</td><td class="num">4</td><td class="num">16</td>
+                <td><span class="bar low" style="width:20px"></span>29 %</td>
+              </tr>
+              <tr>
+                <td>Tyrannie Florale</td><td class="num">28</td>
+                <td class="num">22</td><td class="num">4</td><td class="num">2</td>
+                <td><span class="bar" style="width:55px"></span>79 %</td>
+              </tr>
+              <tr>
+                <td>La Ferme de Jules</td><td class="num">29</td>
+                <td class="num">16</td><td class="num">11</td><td class="num">2</td>
+                <td><span class="bar" style="width:38px"></span>55 %</td>
+              </tr>
+              <tr>
+                <td>Soldat Rouge</td><td class="num">30</td>
+                <td class="num">12</td><td class="num">12</td><td class="num">6</td>
+                <td><span class="bar" style="width:28px"></span>40 %</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Monster Hunter joue avec 10 cartes de moins</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            20 cartes contre 30. Comme on pioche 2 cartes par tour, cette faction
+            n'a plus rien à piocher vers le tour 6-7 quand les autres tiennent
+            encore le double. Et elle n'a <strong>aucun objet ni acte</strong> :
+            pas d'équipement, pas de soin, rien que des monstres.
+          </p>
+          <p><span class="lbl">La question</span>
+            On lui ajoute des cartes, on l'autorise à mettre 3 exemplaires, ou on
+            descend tout le monde à 20 ? Et cette absence totale d'objets, c'est voulu ?
+          </p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>L'Avocat du Diable n'a presque rien à poser sur le terrain</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            Sur ses 15 cartes, seulement <strong>3 sont des monstres posables
+            directement</strong>. Or le héros doit être choisi parmi eux, et le
+            terrain se remplit de monstres. La faction peut passer toute la partie
+            sans rien à mettre en jeu.
+          </p>
+          <p><span class="lbl">La question</span>
+            On lui ajoute des monstres, ou c'est une faction qui gagne autrement ?
+            Et dans ce cas, comment ?
+          </p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Combien d'exemplaires pour les rangs A ?</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            C'est 2 partout, sauf les rangs S et F limités à 1. Rien n'a jamais été
+            dit sur les rangs A, qui sont pourtant souvent les plus fortes cartes.
+          </p>
+          <p><span class="lbl">La question</span> On les limite à 1 aussi ?</p>
+        </div>
+      </section>
+
+      <!-- ============ 2 ============ -->
+      <section id="cartes">
+        <h2 class="sec"><em>2</em> Les cartes dont on n'est pas sûrs</h2>
+
+        <div class="fiche trancher">
+          <header><h4>« Consomme le »</h4><span class="tag trancher">à décider</span></header>
+          <blockquote>Consomme le — Donne +60 HP</blockquote>
+          <p><span class="lbl">Ce qui se passe</span>
+            L'objet reste collé au monstre pour toujours. Du coup Reboot peut le
+            récupérer, et il compte comme objet pour invoquer le Chat.
+          </p>
+          <p><span class="lbl">La question</span>
+            Si « consommer » veut dire qu'on le mange et qu'il disparaît, il doit
+            partir au cimetière en laissant juste le bonus. Ça rendrait Reboot et
+            le Chat beaucoup moins forts.
+          </p>
+          <p style="color:var(--ink-faint);font-size:0.88rem">Concerne : Poulet Sauce Maroille, Le Roi du Burger.</p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>« Sacrifie <em>toutes</em> les… » — trois cartes</h4><span class="tag trancher">à décider</span></header>
+          <div class="wide">
+            <table>
+              <thead><tr><th>Carte</th><th>Ce que dit la carte</th><th>Ce qui se passe</th></tr></thead>
+              <tbody>
+                <tr><td>Chevalier de Mousses</td><td>« toutes les fleurs de rang C »</td><td>il en faut exactement 4</td></tr>
+                <tr><td>Monstres des Abysses</td><td>« tous les monstres de rang C (4) »</td><td>il en faut exactement 4</td></tr>
+                <tr><td>Chevalier de Cuivre</td><td>« tous les équipements de cuivre »</td><td>il en faut exactement 2</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><span class="lbl">Le problème</span>
+            « Toutes » et « exactement 4 », ce n'est pas pareil. Si tu as 3 fleurs
+            sur le terrain, la carte est aujourd'hui <strong>injouable</strong>.
+            Elle pourrait aussi être jouable en sacrifiant les 3.
+          </p>
+          <p><span class="lbl">La question</span>
+            Un nombre exact, ou « tout ce que tu as » ? Le « (4) » des Abysses
+            laisse penser qu'un nombre exact est voulu, mais le Chevalier de Cuivre
+            n'a pas cette précision.
+          </p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Les deux grosses cartes de fin de partie</h4><span class="tag trancher">à décider</span></header>
+          <p><span class="lbl">Ce qui se passe</span>
+            Le <em>Véritable Avocat du Diable</em> et le <em>Véritable Ange de la
+            Raison</em> demandent tous les deux d'avoir joué les 7 péchés. Une fois
+            les 7 joués, <strong>les deux</strong> sont débloqués et peuvent sortir
+            dans la même partie. Leur pouvoir prend l'attaque du plus fort monstre
+            adverse, mais <strong>seulement si elle dépasse la leur</strong> (110).
+          </p>
+          <p><span class="lbl">La question</span>
+            Un seul des deux par partie, ou les deux ? Et le pouvoir doit-il prendre
+            l'attaque adverse dans tous les cas, même plus petite ?
+          </p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Coup de Pression tue souvent sa propre cible</h4><span class="tag trancher">à décider</span></header>
+          <blockquote>Une invocation de rang C peut attaquer une 2<sup>e</sup> fois ce tour, mais subit 30 dégâts</blockquote>
+          <p><span class="lbl">Ce qui se passe</span>
+            Les 30 dégâts tombent <strong>tout de suite</strong>, avant la deuxième
+            attaque. Comme beaucoup de rangs C ont 30 ou 40 PV, la carte meurt
+            souvent sans avoir frappé une seule fois de plus.
+          </p>
+          <p><span class="lbl">La question</span> Les 30 dégâts après la deuxième attaque plutôt qu'avant ?</p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Luxure et Avarice — qui choisit la carte volée ?</h4><span class="tag trancher">à décider</span></header>
+          <blockquote>Vole un objet du deck adverse et ajoute-le à ta main</blockquote>
+          <p><span class="lbl">Ce qui se passe</span>
+            Le jeu prend <strong>le premier objet qu'il trouve</strong>. Pas de
+            choix, et pas de hasard non plus.
+          </p>
+          <p><span class="lbl">La question</span> Tirage au sort, ou le joueur choisit dans une liste ?</p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Le Revolver Violet dure 6 tours</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            Toutes les autres durées du jeu sont 1 tour ou 3 tours. Ce petit objet
+            de rang C donne +10 attaque pendant <strong>6 tours</strong>, ce qui
+            détonne complètement.
+          </p>
+          <p><span class="lbl">La question</span> C'est voulu, ou c'est une coquille pour « +6 d'attaque » ?</p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Attention au piège : la même phrase, deux sens</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            La phrase <strong>« se blesse lui-même »</strong> apparaît sur plusieurs
+            cartes, mais ne veut pas dire la même chose partout :
+          </p>
+          <ul>
+            <li>sur <strong>Contract de Fourberie</strong> (un objet), c'est une
+              vraie règle : la cible se fait mal toute seule ;</li>
+            <li>sur <strong>Idée de Merde</strong>, <strong>Idée Bienveillante</strong>
+              et <strong>Tyrannie Florale</strong>, c'est juste la description imagée
+              de leur attaque normale. Aucun pouvoir spécial.</li>
+          </ul>
+          <p><span class="lbl">La question</span>
+            Si ces trois monstres devaient eux aussi avoir cet effet, il faut le
+            dire — ils deviendraient nettement plus forts.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 3 ============ -->
+      <section id="regles">
+        <h2 class="sec"><em>3</em> Les règles générales choisies à ta place</h2>
+
+        <div class="fiche trancher">
+          <header><h4>La main est toujours pleine</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            On commence avec 10 cartes, le maximum est 10, et on pioche 2 par tour.
+            Autrement dit : <strong>la main est pleine dès le début</strong> et on
+            ne peut presque jamais piocher.
+          </p>
+          <p>
+            C'était la cause du bug remonté au playtest : la première pioche jetait
+            aussitôt une carte au cimetière. Réglé — la carte reste maintenant dans
+            le deck — mais le fond du problème reste.
+          </p>
+          <p><span class="lbl">La question</span>
+            On garde comme ça, on monte la main à 12, ou on démarre avec 7-8 cartes
+            pour laisser de la place ?
+          </p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Quand un joueur n'a plus de cartes, il ne se passe rien</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            Il continue de jouer avec ce qu'il a sur le terrain, sans aucune
+            pénalité. Avec Monster Hunter et ses 20 cartes, ça arrive vers le
+            tour 6-7.
+          </p>
+          <p><span class="lbl">La question</span> Il perd des PV chaque tour, il perd la partie, ou rien ?</p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Celui qui commence n'a rien à payer</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            Le premier joueur est tiré au sort et pioche ses 2 cartes dès son
+            premier tour. Le second ne reçoit rien en compensation, alors que c'est
+            courant dans ce type de jeu.
+          </p>
+          <p><span class="lbl">La question</span> Le second joueur pioche une carte de plus, ou on laisse comme ça ?</p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>« Pendant 1 tour » ne veut pas dire la même chose selon la carte</h4><span class="tag trancher">à décider</span></header>
+          <div class="wide">
+            <table>
+              <thead><tr><th>Carte</th><th>Ce que dit la carte</th><th>Ce que ça fait vraiment</th></tr></thead>
+              <tbody>
+                <tr><td>Grenade de la Révolution</td><td>+80 attaque, 1 tour</td><td><strong>Seulement le tour où on la joue.</strong> Fini avant ton tour suivant.</td></tr>
+                <tr><td>Faux de la Mort du Fermier</td><td>+60 attaque, 1 tour</td><td>Pareil</td></tr>
+                <tr><td>Paresse, Tiramisu, Fourberie</td><td>posés sur l'adversaire</td><td>Couvrent bien <strong>tout son prochain tour</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><span class="lbl">La question</span>
+            Est-ce que « 1 tour » sur un bonus devrait aussi couvrir ton prochain
+            tour, pour que ce soit cohérent des deux côtés ?
+          </p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Le mulligan ne peut pas te redonner ce que tu viens de jeter</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            Quand tu échanges des cartes au début, le jeu te donne les nouvelles
+            <strong>avant</strong> de remettre les anciennes dans le deck. Tu ne peux
+            donc jamais retomber sur une carte que tu viens de jeter. Hearthstone
+            fait l'inverse.
+          </p>
+          <p><span class="lbl">La question</span> On garde, ou on autorise le retour de bâton ?</p>
+        </div>
+
+        <div class="fiche trancher">
+          <header><h4>Un filet de sécurité invisible pour le héros</h4><span class="tag trancher">à décider</span></header>
+          <p>
+            Le jeu s'arrange toujours pour qu'il te reste au moins un monstre en
+            main, sinon tu ne pourrais pas choisir de héros et la partie serait
+            bloquée. Ce n'est pas une règle du jeu, c'est une rustine.
+          </p>
+          <p><span class="lbl">La question</span>
+            On l'assume comme une règle, ou on résout autrement — par exemple un
+            héros par défaut ?
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 4 ============ -->
+      <section id="decide">
+        <h2 class="sec"><em>4</em> Ce qui est déjà décidé</h2>
+        <p>Listé ici au cas où l'une de ces décisions serait à revoir.</p>
+        <div class="done">
+          <div class="wide">
+            <table>
+              <thead><tr><th>Point</th><th>Ce qui s'applique</th></tr></thead>
+              <tbody>
+                <tr><td>Fourberie de Satan</td><td>La cible se blesse de <strong>son attaque du moment</strong>, bonus compris. Plus de 10 forfaitaires.</td></tr>
+                <tr><td>Envie</td><td><strong>Tu choisis</strong> le monstre de ta main qui vient prendre la place</td></tr>
+                <tr><td>Envie sans monstre en main</td><td>Carte injouable</td></tr>
+                <tr><td>Défausse quand la main est pleine</td><td>Supprimée : la carte reste dans le deck</td></tr>
+                <tr><td>Reboot, Luxure, Avarice avec la main pleine</td><td>L'action est refusée, aucune carte n'est détruite</td></tr>
+                <tr><td>Héros protégé par ses monstres</td><td>Il n'est plus proposé en cible tant qu'il en reste un</td></tr>
+                <tr><td>Cartes sans cible (les péchés)</td><td>Demandent une confirmation avant de partir</td></tr>
+                <tr><td>Mal d'invocation du héros</td><td>Il dort son premier tour, comme un monstre posé de la main</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 5 ============ -->
+      <section id="savoir">
+        <h2 class="sec"><em>5</em> Bon à savoir, sans question</h2>
+
+        <div class="fiche">
+          <header><h4>Les descriptions d'attaque sont de la déco</h4><span class="tag info">bon à savoir</span></header>
+          <p>
+            Chaque monstre a un nom d'attaque, une phrase et un chiffre. La phrase
+            est là pour l'ambiance, le chiffre est les dégâts.
+            <em>« Crée une tornade qui terrasse son adversaire »</em> ne veut pas
+            dire que la carte frappe tout le monde. Vérifié sur les visuels.
+          </p>
+          <p>
+            Les seuls monstres qui ont un vrai pouvoir sont ceux dont le texte nomme
+            explicitement quelque chose : Provocation, Monarchie Florale, Karma
+            Floral, Appel de la Révolution, Culture de l'Aura, Libération,
+            Manipulation du Diable, Omnipotence Divine.
+          </p>
+        </div>
+
+        <div class="fiche">
+          <header><h4>Le Poulet Feuilleté ne frappera jamais</h4><span class="tag info">bon à savoir</span></header>
+          <p>
+            30 PV, <strong>0 attaque</strong>, Provocation. C'est un mur, et c'est
+            cohérent avec la carte — signalé au cas où le 0 serait une erreur de saisie.
+          </p>
+        </div>
+
+        <div class="fiche">
+          <header><h4>Le Dévoreur de Papillons est la seule carte-surprise</h4><span class="tag info">bon à savoir</span></header>
+          <p>
+            Il n'existe dans aucun deck et n'apparaît qu'à la mort de la Fleure
+            Royale avec un Flingue. Si d'autres cartes doivent marcher comme ça,
+            il faut nous le dire.
+          </p>
+        </div>
+
+        <div class="fiche">
+          <header><h4>On peut équiper le héros</h4><span class="tag info">bon à savoir</span></header>
+          <p>
+            Tous les objets « alliés » se posent aussi bien sur le héros que sur un
+            monstre. Rien ne l'interdit, mais ça le rend très solide : Bandana
+            +40 PV puis Armure de Cuivres +50 PV, par exemple.
+          </p>
+        </div>
+
+        <div class="fiche">
+          <header><h4>Rien ne force à jouer</h4><span class="tag info">bon à savoir</span></header>
+          <p>
+            Un joueur qui recharge la page retrouve sa partie. Mais il n'y a
+            <strong>aucun chrono</strong> : si quelqu'un s'absente, la partie reste
+            bloquée indéfiniment.
+          </p>
+        </div>
+      </section>
+
+      <footer class="end">
+        Tous les chiffres de ce document ont été relus dans le jeu lui-même,
+        pas reconstitués de mémoire.
+      </footer>
+
+    </main>
+  </div>
+</div>
